@@ -17,8 +17,3 @@
 
 .gitignore
 .idea/
-clock.go
-clock_example_test.go
-clock_test.go
-job.go
-rbtree_test.go
