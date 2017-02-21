@@ -1,0 +1,79 @@
+package clock
+
+import (
+	"github.com/HuKeping/rbtree"
+	"log"
+	"testing"
+	"time"
+)
+
+//因为采用的第三方实现的红黑树，为确保其功能与性能，进行补充测试。
+// 重点关注struct中，多属性同时作为判等条件的情况下，能否正确管理。
+var (
+	size = 100
+	//r    = rand.New(rand.NewSource(time.Now().Unix()))
+)
+
+func print(item rbtree.Item) bool {
+	job, ok := item.(Job)
+	if !ok {
+		return false
+	}
+	log.Printf("%+v|%+v \n", job.id, job.actionTime.String())
+	return true
+}
+func TestRbtree_Insert(t *testing.T) {
+
+	items := make([]Job, size)
+	//now:=time.Now()
+	tree := rbtree.New()
+	for i := 0; i < size; i++ {
+		items[i] = newOnceJob(time.Duration(i * 1000))
+		items[i].actionTime = items[i].createTime.Add(items[i].IntervalTime)
+		tree.Insert(items[i])
+
+	}
+	startnode := tree.Min()
+	tree.Ascend(startnode, print)
+}
+
+func TestRbtree_Delete(t *testing.T) {
+	var (
+		tree         = rbtree.New()
+		items        = make([]*Job, size)
+		wantdelitems = make([]*Job, 0)
+
+		mod = 5 + r.Intn(15) // 获取(5,20)之间的随机数
+	)
+	print := func(item rbtree.Item) bool {
+		_, ok := item.(Job)
+		if !ok {
+			return false
+		}
+		//t.Logf("%+v|%+v \n", je.id, je.actionTime.String())
+		return true
+	}
+
+	for i := 0; i < size; i++ {
+		item := newOnceJob(time.Duration(i * 1000))
+		item.actionTime = item.createTime.Add(item.IntervalTime)
+		items[i] = &item
+		tree.Insert(&item)
+		//t.Logf("itmes[%v]:%+v \n",i,item)
+
+		if i%mod == 0 {
+			wantdelitems = append(wantdelitems, &item)
+		}
+	}
+
+	for i := 0; i < len(wantdelitems); i++ {
+		tree.Delete(wantdelitems[i])
+
+	}
+	if int(tree.Len()) != len(items)-len(wantdelitems) {
+		t.Errorf("数据删除失败！最终树中存在%v条记录，而期望存在%v条记录", tree.Len(), len(items)-len(wantdelitems))
+		startnode := tree.Min()
+		tree.Ascend(startnode, print)
+
+	}
+}
