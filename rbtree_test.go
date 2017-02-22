@@ -5,6 +5,7 @@ import (
 	"log"
 	"testing"
 	"time"
+	"fmt"
 )
 
 //因为采用的第三方实现的红黑树，为确保其功能与性能，进行补充测试。
@@ -13,18 +14,28 @@ var (
 	size = 100
 	//r    = rand.New(rand.NewSource(time.Now().Unix()))
 )
-
+func newOnceJob(delay time.Duration) jobItem {
+	now := time.Now()
+	job := jobItem{
+		createTime:   now,
+		IntervalTime: delay,
+		f: func() {
+			fmt.Println("临时任务事件")
+		},
+	}
+	return job
+}
 func print(item rbtree.Item) bool {
-	job, ok := item.(Job)
+	job, ok := item.(*jobItem)
 	if !ok {
 		return false
 	}
-	log.Printf("%+v|%+v \n", job.id, job.actionTime.String())
+	log.Printf("%+v|%+v \n", job.Id(), job.actionTime.String())
 	return true
 }
 func TestRbtree_Insert(t *testing.T) {
 
-	items := make([]Job, size)
+	items := make([]jobItem, size)
 	//now:=time.Now()
 	tree := rbtree.New()
 	for i := 0; i < size; i++ {
@@ -40,8 +51,8 @@ func TestRbtree_Insert(t *testing.T) {
 func TestRbtree_Delete(t *testing.T) {
 	var (
 		tree         = rbtree.New()
-		items        = make([]*Job, size)
-		wantdelitems = make([]*Job, 0)
+		items        = make([]*jobItem, size)
+		wantdelitems = make([]*jobItem, 0)
 
 		mod = 5 + r.Intn(15) // 获取(5,20)之间的随机数
 	)

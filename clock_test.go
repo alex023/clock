@@ -6,13 +6,12 @@ import (
 	"sync"
 	"testing"
 	"math"
-	"fmt"
 )
 
 var (
 	r = rand.New(rand.NewSource(time.Now().Unix()))
 )
-//Counter 支持并发的计数器
+//counter 支持并发的计数器
 type Counter struct {
 	sync.Mutex
 	counter int
@@ -25,18 +24,6 @@ func (counter *Counter) AddOne() {
 }
 func (counter *Counter) Count() int {
 	return counter.counter
-}
-
-func newOnceJob(delay time.Duration) Job {
-	now := time.Now()
-	job := Job{
-		createTime:   now,
-		IntervalTime: delay,
-		f: func() {
-			fmt.Println("临时任务事件")
-		},
-	}
-	return job
 }
 
 func TestClock_Create(t *testing.T) {
@@ -77,28 +64,27 @@ func TestClock_AddOnceJob(t *testing.T) {
 //TestClock_WaitJobs 测试当前待执行任务列表中的事件
 func TestClock_WaitJobs(t *testing.T) {
 	var (
-		//shouldDealNum = 10 //执行次数
-		jackClock = NewClock()
+		myClock   = NewClock()
 		randscope = 50 * 1000 * 1000 //随机范围
 		interval  = time.Millisecond*50 + time.Duration(r.Intn(randscope))
 		jobFunc   = func() {
 			//fmt.Println("任务事件")
 		}
 	)
-	job, inserted := jackClock.AddJobRepeat(interval, 0, jobFunc)
+	job, inserted := myClock.AddJobRepeat(interval, 0, jobFunc)
 	if !inserted {
 		t.Error("定时任务创建失败")
 	}
 	time.Sleep(time.Second)
 
-	if jackClock.WaitJobs() != 1 {
+	if myClock.WaitJobs() != 1 {
 		t.Error("任务添加异常")
 	}
-	lists := jackClock.waitJobs()
-	if len(lists) != jackClock.WaitJobs() {
-		t.Error("数据列表操作获取的数据与JackClock实际情况不一致！")
+	lists := myClock.waitJobs()
+	if len(lists) != myClock.WaitJobs() {
+		t.Error("数据列表操作获取的数据与Clock实际情况不一致！")
 	}
-	jackClock.DelJob(job.Id())
+	myClock.DelJob(job.Id())
 
 }
 
@@ -109,20 +95,22 @@ func TestClock_AddRepeatJob(t *testing.T) {
 		jobsNum   = uint64(1000)                                            //执行次数
 		randscope = 50 * 1000                                               //随机范围
 		interval  = time.Microsecond*100 + time.Duration(r.Intn(randscope)) //100-150µs时间间隔
+		counter   = new(Counter)
 	)
-
-	jobcall, inserted := myClock.AddJobRepeat(interval, jobsNum, nil)
+	f := func() {
+		counter.AddOne()
+	}
+	job, inserted := myClock.AddJobRepeat(interval, jobsNum, f)
 	if !inserted {
 		t.Error("任务初始化失败，任务事件没有添加成功")
 	}
-	counter := &Counter{}
-	for range jobcall.C() {
-		counter.AddOne()
-	}
-	myClock.DelJob(jobcall.id)
+	for range job.C(){
 
-	if myClock.Counter() != jobsNum || counter.Count() != int(jobsNum) {
-		t.Errorf("任务添加存在问题,应该%v次，实际执行%v\n", jobsNum, myClock.Counter())
+	}
+	//重复任务的方法是协程调用，可能还没有执行，job.C就已经退出，需要阻塞观察
+	time.Sleep(time.Second)
+	if int(myClock.Counter()) != counter.Count() || counter.Count() != int(jobsNum) {
+		t.Errorf("任务添加存在问题,应该%v次，实际执行%v\n", jobsNum, counter.Count())
 	}
 
 }
@@ -130,7 +118,7 @@ func TestClock_AddRepeatJob(t *testing.T) {
 //TestClock_AddRepeatJob2 测试间隔时间不同的两个重复任务，是否会交错执行
 func TestClock_AddRepeatJob2(t *testing.T) {
 	var (
-		jackClock  = NewClock()
+		myClock    = NewClock()
 		interval1  = time.Millisecond * 20 //间隔20毫秒
 		interval2  = time.Millisecond * 20 //间隔20毫秒
 		singalChan = make(chan int, 10)
@@ -149,17 +137,17 @@ func TestClock_AddRepeatJob2(t *testing.T) {
 			}
 		}
 	}()
-	call1, inserted1 := jackClock.AddJobRepeat(interval1, 0, func() { jobFunc(1) })
+	call1, inserted1 := myClock.AddJobRepeat(interval1, 0, func() { jobFunc(1) })
 	time.Sleep(time.Millisecond * 10)
-	call2, inserted2 := jackClock.AddJobRepeat(interval2, 0, func() { jobFunc(2) })
+	call2, inserted2 := myClock.AddJobRepeat(interval2, 0, func() { jobFunc(2) })
 
 	if !inserted1 || !inserted2 {
 		t.Error("任务初始化失败，没有添加成功")
 	}
 	time.Sleep(time.Second)
 
-	jackClock.DelJob(call1.Id())
-	jackClock.DelJob(call2.Id())
+	myClock.DelJob(call1.Id())
+	myClock.DelJob(call2.Id())
 
 }
 
@@ -220,26 +208,26 @@ func TestClock_AddJobs(t *testing.T) {
 	}
 }
 
-//TestJackClock_AddEvent200kJob 测试20万条任务下，其中任意一条数据从加入到执行的时间延迟，是否超过约定的最大值
+//TestClock_AddEvent200kJob 测试20万条任务下，其中任意一条数据从加入到执行的时间延迟，是否超过约定的最大值
 // 目标：
 // 	1.按照10k次/秒的任务频率，延时超过200µs的不得超过2%。
 //	2.不得有任何一条事件提醒，延时超过100ms。
 // Note:笔记本(尤其是windows操作系统）可能无法通过测试
-func TestJackClock_AddEvent200kJob(t *testing.T) {
+func TestClock_AddEvent200kJob(t *testing.T) {
 	var (
-		jobsNum       = 200000 //添加任务数量
-		beyondCounter = &Counter{}
+		jobsNum              = 200000 //添加任务数量
+		beyondCounter  = &Counter{}
 		wg            sync.WaitGroup
 		interval      = time.Microsecond * 100
 		delay1        = time.Microsecond * 200 //适度允许的小延时
 		delay2        = time.Millisecond * 100 //不允许出现的最大延时
-		jackClock     = NewClock()
+		myClock       = NewClock()
 	)
 	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
 	//按照每秒10k次，间隔100µs一条。
 	for i := 0; i < jobsNum; i++ {
 		jobInterval := time.Second + time.Duration(i)*interval
-		job, inserted := jackClock.AddJobWithTimeout(jobInterval, nil)
+		job, inserted := myClock.AddJobWithTimeout(jobInterval, nil)
 		if !inserted {
 			t.Error("任务添加存在问题")
 			break
@@ -247,18 +235,18 @@ func TestJackClock_AddEvent200kJob(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			event := <-job.C()
-			if event.Delay().Nanoseconds() > delay1.Nanoseconds() {
+			if event.delay().Nanoseconds() > delay1.Nanoseconds() {
 				beyondCounter.AddOne()
 			}
-			if event.Delay().Nanoseconds() > delay2.Nanoseconds() {
-				t.Fatalf("事件提醒延时=%vµs,超过误差最大允许值%vµs:\njob%+v\n", event.Delay().Nanoseconds()/1000, delay2.Nanoseconds()/1000, event)
+			if event.delay().Nanoseconds() > delay2.Nanoseconds() {
+				t.Fatalf("事件提醒延时=%vµs,超过误差最大允许值%vµs:\njobItem%+v\n", event.delay().Nanoseconds()/1000, delay2.Nanoseconds()/1000, event)
 			}
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	if jobsNum != int(jackClock.Counter()) {
-		t.Errorf("应该执行%v次，实际执行%v次。所有值应该相等。\n", jobsNum, jackClock.Counter())
+	if jobsNum != int(myClock.Counter()) {
+		t.Errorf("应该执行%v次，实际执行%v次。所有值应该相等。\n", jobsNum, myClock.Counter())
 	}
 	if beyondCounter.Count()*100/jobsNum >= 2 {
 		t.Errorf("超时任务数=%v,超过了总数%v的2%%。/n", beyondCounter.Count(), jobsNum)
@@ -274,7 +262,7 @@ func TestClock_DelJob(t *testing.T) {
 	var (
 		jobsNum   = 20000
 		randscope = 1 * 1000 * 1000 * 1000
-		jobs      = make([]*Job, jobsNum)
+		jobs      = make([]Job, jobsNum)
 		delmod    = r.Intn(jobsNum)
 		myClock   = NewClock()
 	)
@@ -284,10 +272,7 @@ func TestClock_DelJob(t *testing.T) {
 		jobs[i] = job
 	}
 
-	for i := 0; i < jobsNum; i++ {
-
-	}
-	deleted := myClock.DelJob(jobs[delmod].id)
+	deleted := myClock.DelJob(jobs[delmod].Id())
 	if !deleted || myClock.WaitJobs() != jobsNum-1 {
 		t.Errorf("任务删除%v，删除后，应该只剩下%v条任务，实际还有%v条\n", deleted, myClock.Counter(), jobsNum-1)
 
@@ -298,7 +283,7 @@ func TestClock_DelJob(t *testing.T) {
 func TestJob_Delay(t *testing.T) {
 	var (
 		jobsNum  = 100000 //添加任务数量
-		wg        sync.WaitGroup
+		wg       sync.WaitGroup
 		interval = time.Microsecond * 100
 		myClock  = NewClock()
 	)
@@ -315,8 +300,8 @@ func TestJob_Delay(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			<-job.C()
-			if job.Delay().Seconds() > 0.01 {
-				t.Error("存在延时超过100ms极限的情况：", job.Delay().Seconds())
+			if job.delay().Seconds() > 0.01 {
+				t.Error("存在延时超过100ms极限的情况：", job.delay().Seconds())
 			}
 			wg.Done()
 		}()
@@ -335,7 +320,7 @@ func TestClock_DelJobs(t *testing.T) {
 		myClock     = NewClock()
 		jobsNum     = 20000
 		randscope   = 1 * 1000 * 1000 * 1000
-		jobs        = make([]*Job, jobsNum)
+		jobs        = make([]Job, jobsNum)
 		wantdeljobs = make([]uint64, jobsNum)
 	)
 	for i := 0; i < jobsNum; i++ {
@@ -359,12 +344,13 @@ func BenchmarkClock_AddJob(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		newjob, inserted := myClock.AddJobWithTimeout(time.Millisecond*5, nil)
 		if !inserted {
-			b.Error("can not insert job")
+			b.Error("can not insert jobItem")
 			break
 		}
 		<-newjob.C()
 	}
 }
+
 // 测试通道消息传送的时间消耗
 func BenchmarkChan(b *testing.B) {
 	tmpChan := make(chan time.Duration, 1)
