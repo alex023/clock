@@ -31,10 +31,10 @@ type JobType int
 // Clock 任务队列的控制器
 type Clock struct {
 	seq              uint64
-	jobIndex         map[uint64]*Job //缓存任务id-job
-	jobList          *rbtree.Rbtree  //job索引，定位撤销通道
-	times            uint64          //最多执行次数
-	counter          uint64          //已执行次数，不得大于times
+	jobIndex         map[uint64]*jobItem //缓存任务id-jobItem
+	jobList          *rbtree.Rbtree      //job索引，定位撤销通道
+	times            uint64              //最多执行次数
+	counter          uint64              //已执行次数，不得大于times
 	pauseSignChan    chan struct{}
 	continueSignChan chan struct{}
 }
@@ -45,14 +45,14 @@ func NewClock() *Clock {
 		jobList:          rbtree.New(),
 		pauseSignChan:    make(chan struct{}, 0),
 		continueSignChan: make(chan struct{}, 0),
-		jobIndex:         make(map[uint64]*Job),
+		jobIndex:         make(map[uint64]*jobItem),
 	}
 	//为Clock内部的事件队列创建一个一直无法执行的最大节点，使任务队列始终存在未完成任务
-	untouchedJob := Job{
+	untouchedJob := jobItem{
 		createTime:   time.Now(),
 		IntervalTime: time.Duration(math.MaxInt64),
 		f: func() {
-			fmt.Println("this job is untouched!")
+			fmt.Println("this jobItem is untouched!")
 		},
 	}
 	now := time.Now()
@@ -68,12 +68,12 @@ func NewClock() *Clock {
 }
 
 // AddJobWithTimeout 向任务队列中添加一次性任务。
-//	@timeout:	相对于当前时间，延后多久执行任务，不可低于5ms。
+//	@timeout:	相对于当前时间，延后多久执行任务，不可为负。
 //	@jobFunc:	定时执行的任务。
 //	return
 // 	@job:		返还注册的任务事件。
-func (jl *Clock) AddJobWithTimeout(timeout time.Duration, jobFunc func()) (job *Job, inserted bool) {
-	if timeout.Seconds() < 0.005 {
+func (jl *Clock) AddJobWithTimeout(timeout time.Duration, jobFunc func()) (job Job, inserted bool) {
+	if timeout.Nanoseconds() <= 0 {
 		return nil, false
 	}
 	now := time.Now()
@@ -88,13 +88,13 @@ func (jl *Clock) AddJobWithTimeout(timeout time.Duration, jobFunc func()) (job *
 }
 
 // AddJobWithDeadtime 向任务队列中添加一次性任务。
-//	@timeaction:	执行时间点，必须在当前时间点5ms毫秒后。
+//	@timeaction:	在当前时间之后的时间点，不可早于当前时间。
 //	@jobFunc:	定时执行的任务。
 //	return
 // 	@job:		返还注册的任务事件。
-func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job *Job, inserted bool) {
+func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job Job, inserted bool) {
 	timeout := timeaction.Sub(time.Now())
-	if timeout.Seconds() < 0.005 {
+	if timeout.Nanoseconds() <= 0 {
 		return nil, false
 	}
 	now := time.Now()
@@ -109,14 +109,14 @@ func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job *
 }
 
 // AddJobRepeat 向任务队列中添加重复执行任务。
-//	@jobInterval:	相对于当前时间，延后多久执行任务，不可为负。
+//	@jobInterval:	相对于当前时间，间隔事件必须大于0。
 //	@jobTimes:	执行次数，为0表示不限制
 //	@jobFunc:	定时执行的任务。
 //	return
-// 	@job:		返还注册的任务事件。
+// 	@job:	返还注册的任务事件。
 //Note：
 // 对于times为0的任务，在不使用时，务必调用DelJob，以释放。
-func (jl *Clock) AddJobRepeat(jobInterval time.Duration, jobTimes uint64, jobFunc func()) (job *Job, inserted bool) {
+func (jl *Clock) AddJobRepeat(jobInterval time.Duration, jobTimes uint64, jobFunc func()) (job Job, inserted bool) {
 	if jobInterval.Nanoseconds() <= 0 {
 		return nil, false
 	}
@@ -131,21 +131,22 @@ func (jl *Clock) AddJobRepeat(jobInterval time.Duration, jobTimes uint64, jobFun
 	return
 }
 
-func (jl *Clock) addJob(createTime time.Time, jobInterval time.Duration, jobTimes uint64, jobFunc func()) (job *Job, inserted bool) {
+func (jl *Clock) addJob(createTime time.Time, jobInterval time.Duration, jobTimes uint64, jobFunc func()) (job Job, inserted bool) {
 	inserted = true
 	jl.seq++
-	job = &Job{
+	event := &jobItem{
 		id:           jl.seq,
-		Times:        jobTimes,
+		times:        jobTimes,
 		createTime:   createTime,
 		actionTime:   createTime.Add(jobInterval),
 		IntervalTime: jobInterval,
-		msgChan:      make(chan *Job, 10),
+		msgChan:      make(chan Job, 10),
 		f:            jobFunc,
 	}
-	jl.jobIndex[job.id] = job
-	jl.jobList.Insert(job)
+	jl.jobIndex[event.id] = event
+	jl.jobList.Insert(event)
 
+	job = event
 	return
 
 }
@@ -185,7 +186,7 @@ func (jl *Clock) DelJobs(jobIds []uint64) {
 	jl.continueSignChan <- struct{}{}
 	return
 }
-func (jl *Clock) removeJob(job *Job) {
+func (jl *Clock) removeJob(job *jobItem) {
 	jl.jobList.Delete(job)
 	delete(jl.jobIndex, job.Id())
 	close(job.msgChan)
@@ -199,7 +200,7 @@ Pause:
 	<-jl.continueSignChan
 	for {
 		v := jl.jobList.Min()
-		job, _ := v.(*Job) //ignore ok-assert
+		job, _ := v.(*jobItem) //ignore ok-assert
 		timeout := job.actionTime.Sub(time.Now())
 		timer.Reset(timeout)
 		select {
@@ -222,7 +223,7 @@ Pause:
 	}
 }
 
-// Counter 已经执行的任务数。对于重复任务，会计算多次
+// counter 已经执行的任务数。对于重复任务，会计算多次
 func (jl *Clock) Counter() uint64 {
 	return jl.counter
 }
@@ -243,8 +244,8 @@ func (jl *Clock) waitJobs() []Job {
 	jobs := make([]Job, 0)
 
 	echo := func(item rbtree.Item) bool {
-		if job, ok := item.(*Job); ok {
-			jobs = append(jobs, *job)
+		if job, ok := item.(Job); ok {
+			jobs = append(jobs, job)
 		}
 		return true
 	}
