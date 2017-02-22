@@ -11,7 +11,7 @@ import (
 var (
 	r = rand.New(rand.NewSource(time.Now().Unix()))
 )
-//counter 支持并发的计数器
+//count 支持并发的计数器
 type Counter struct {
 	sync.Mutex
 	counter int
@@ -29,7 +29,7 @@ func (counter *Counter) Count() int {
 func TestClock_Create(t *testing.T) {
 	myClock := NewClock()
 	if myClock.WaitJobs() != 0 || myClock.Counter() != 0 {
-		t.Errorf("JobList init have error.len=%d,counter=%d", myClock.WaitJobs(), myClock.Counter())
+		t.Errorf("JobList init have error.len=%d,count=%d", myClock.WaitJobs(), myClock.Counter())
 		//joblist.Debug()
 	}
 

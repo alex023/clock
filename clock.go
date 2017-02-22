@@ -6,16 +6,16 @@
 //	4、支持注册任务的函数调用，及事件通知。
 //	5、低延迟，在万次/秒情况下，平均延迟在200微秒内，最大不超过100毫秒。
 // 基本处理逻辑：
-//	1、定时轮训事件，流程是：
-// 		a、注册重复任务
+//	1、重复性任务，流程是：
+//		a、注册重复任务
 //		b、时间抵达时，控制器调用注册函数，并发送通知
-//		c、控制器更新该任务的下次执行时间点
-//		d、控制器等待最近一次需要执行的任务
-//	2、一次性事件，可以是服务运行时，当前时间点之后的任意事件，流程是：
-// 		a、注册一次性任务
+//		c、如果次数达到限制，则撤销；否则，控制器更新该任务的下次执行时间点
+//		d、控制器等待下一个最近需要执行的任务
+//	2、一次性任务，可以是服务运行时，当前时间点之后的任意事件，流程是：
+//		a、注册一次性任务
 //		b、时间抵达时，控制器调用注册函数，并发送通知
 //		c、控制器释放该任务
-//		d、控制器等待最近一次需要执行的任务
+//		d、控制器等待下一个最近需要执行的任务
 // 使用方式，参见示例代码。
 package clock
 
@@ -39,7 +39,7 @@ type Clock struct {
 	continueSignChan chan struct{}
 }
 
-//NewClock 创建一个任务队列的控制器
+//NewClock Create a task queue controller
 func NewClock() *Clock {
 	clock := &Clock{
 		jobList:          rbtree.New(),
@@ -67,11 +67,11 @@ func NewClock() *Clock {
 	return clock
 }
 
-// AddJobWithTimeout 向任务队列中添加一次性任务。
-//	@timeout:	相对于当前时间，延后多久执行任务，不可为负。
-//	@jobFunc:	定时执行的任务。
+// AddJobWithTimeout insert a timed task with time duration after now
+// 	@timeout:	duration after now
+//	@jobFunc:	action function
 //	return
-// 	@job:		返还注册的任务事件。
+// 	@job:
 func (jl *Clock) AddJobWithTimeout(timeout time.Duration, jobFunc func()) (job Job, inserted bool) {
 	if timeout.Nanoseconds() <= 0 {
 		return nil, false
@@ -87,7 +87,7 @@ func (jl *Clock) AddJobWithTimeout(timeout time.Duration, jobFunc func()) (job J
 	return
 }
 
-// AddJobWithTimeout 向任务队列中添加一次性任务。
+// AddJobWithTimeout update a timed task with time duration after now
 //	@jobId:		job Unique identifier
 //	@timeout:	new job do time
 func (jl *Clock) UpdateJobTimeout(jobId uint64, timeout time.Duration) (job Job, updated bool) {
@@ -119,9 +119,9 @@ func (jl *Clock) UpdateJobTimeout(jobId uint64, timeout time.Duration) (job Job,
 	return
 }
 
-// AddJobWithDeadtime 向任务队列中添加一次性任务。
-//	@timeaction:	在当前时间之后的时间点，不可早于当前时间。
-//	@jobFunc:	定时执行的任务。
+// AddJobWithDeadtime insert a timed task with time point after now
+//	@timeaction:	Execution start time. must after now,else return false
+//	@jobFunc:	Exectuion function
 //	return
 // 	@job:		返还注册的任务事件。
 func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job Job, inserted bool) {
@@ -140,10 +140,10 @@ func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job J
 	return
 }
 
-// AddJobRepeat 向任务队列中添加重复执行任务。
-//	@jobInterval:	相对于当前时间，间隔事件必须大于0。
-//	@jobTimes:	执行次数，为0表示不限制
-//	@jobFunc:	定时执行的任务。
+// AddJobRepeat add a repeat task with interval duration
+//	@jobInterval:	The two time interval operation
+//	@jobTimes:	Execution times
+//	@jobFunc:	Exectuion funciton
 //	return
 // 	@job:	返还注册的任务事件。
 //Note：
@@ -183,7 +183,7 @@ func (jl *Clock) addJob(createTime time.Time, jobInterval time.Duration, jobTime
 
 }
 
-// DelJob 向任务队列中删除已经添加的任务，如果该key不存在，则返回false.
+// DelJob Deletes the task that has been added to the task queue. If the key does not exist, return false.
 func (jl *Clock) DelJob(jobId uint64) (deleted bool) {
 	if jobId < 0 {
 		deleted = false
@@ -255,7 +255,7 @@ Pause:
 	}
 }
 
-// counter 已经执行的任务数。对于重复任务，会计算多次
+// count 已经执行的任务数。对于重复任务，会计算多次
 func (jl *Clock) Counter() uint64 {
 	return jl.counter
 }

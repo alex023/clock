@@ -2,10 +2,10 @@ package main
 
 import (
 	"sync"
-	"github.com/alex023/clock"
 	"errors"
 	"time"
 	"fmt"
+	"github.com/alex023/clock"
 )
 
 type Session struct {
@@ -70,7 +70,7 @@ func (s *Session) GetTokenNum()int {
 func (s *Session) removeToken(token string) {
 	s.Lock()
 	defer s.Unlock()
-
+	fmt.Println("token:",token," is removed!@",time.Now().Format("15:04:05:00")) //just for watching
 	delete(s.cache, token)
 }
 
@@ -85,14 +85,12 @@ func main() {
 	fmt.Println()
 
 	fmt.Println("test add token and update it")
-	session.AddToken("alex023_2", 10)
+	session.AddToken("alex023_2", 4)
 	for i:=0;i<5;i++{
-		time.Sleep(time.Second*2)
+		time.Sleep(time.Second*1)
 		if i==1{
-			session.AddToken("alex023_2",1)
+			session.AddToken("alex023_2",5)
 		}
 		fmt.Printf("%v|session have %2d tokens,found token=alex023_2 %v \n",time.Now().Format("15:04:05"),session.GetTokenNum(),session.GetToken("alex023_2"))
 	}
-
-
 }
