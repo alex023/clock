@@ -87,6 +87,38 @@ func (jl *Clock) AddJobWithTimeout(timeout time.Duration, jobFunc func()) (job J
 	return
 }
 
+// AddJobWithTimeout 向任务队列中添加一次性任务。
+//	@jobId:		job Unique identifier
+//	@timeout:	new job do time
+func (jl *Clock) UpdateJobTimeout(jobId uint64, timeout time.Duration) (job Job, updated bool) {
+	if timeout.Nanoseconds() <= 0 {
+		return nil, false
+	}
+	now := time.Now()
+
+	//pause
+	jl.pauseSignChan <- struct{}{}
+
+	jobitem, founded := jl.jobIndex[jobId]
+	if !founded {
+		//job=nil
+		//update=false
+		jl.continueSignChan <- struct{}{}
+		return
+	}
+	// update jobitem rbtree node
+	jl.jobList.Delete(jobitem)
+	jobitem.actionTime = now.Add(timeout)
+	jl.jobList.Insert(jobitem)
+
+	//continue
+	jl.continueSignChan <- struct{}{}
+
+	updated = true
+	job = jobitem
+	return
+}
+
 // AddJobWithDeadtime 向任务队列中添加一次性任务。
 //	@timeaction:	在当前时间之后的时间点，不可早于当前时间。
 //	@jobFunc:	定时执行的任务。
