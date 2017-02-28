@@ -11,18 +11,18 @@ import (
 var (
 	r = rand.New(rand.NewSource(time.Now().Unix()))
 )
-//count 支持并发的计数器
-type Counter struct {
+//_Counter 支持并发的计数器
+type _Counter struct {
 	sync.Mutex
 	counter int
 }
 
-func (counter *Counter) AddOne() {
+func (counter *_Counter) AddOne() {
 	counter.Lock()
 	counter.counter++
 	counter.Unlock()
 }
-func (counter *Counter) Count() int {
+func (counter *_Counter) Count() int {
 	return counter.counter
 }
 
@@ -80,8 +80,7 @@ func TestClock_WaitJobs(t *testing.T) {
 	if myClock.WaitJobs() != 1 {
 		t.Error("任务添加异常")
 	}
-	lists := myClock.waitJobs()
-	if len(lists) != myClock.WaitJobs() {
+	if myClock.WaitJobs() != 1 {
 		t.Error("数据列表操作获取的数据与Clock实际情况不一致！")
 	}
 	myClock.DelJob(job.Id())
@@ -95,7 +94,7 @@ func TestClock_AddRepeatJob(t *testing.T) {
 		jobsNum   = uint64(1000)                                            //执行次数
 		randscope = 50 * 1000                                               //随机范围
 		interval  = time.Microsecond*100 + time.Duration(r.Intn(randscope)) //100-150µs时间间隔
-		counter   = new(Counter)
+		counter   = new(_Counter)
 	)
 	f := func() {
 		counter.AddOne()
@@ -104,7 +103,7 @@ func TestClock_AddRepeatJob(t *testing.T) {
 	if !inserted {
 		t.Error("任务初始化失败，任务事件没有添加成功")
 	}
-	for range job.C(){
+	for range job.C() {
 
 	}
 	//重复任务的方法是协程调用，可能还没有执行，job.C就已经退出，需要阻塞观察
@@ -182,11 +181,11 @@ func TestClock_AddJobs(t *testing.T) {
 		jobsNum   = 200000                 //添加任务数量
 		randscope = 1 * 1000 * 1000 * 1000 //随机范围1秒
 		myClock   = NewClock()
-		counter   = &Counter{}
+		counter   = &_Counter{}
 		wg        sync.WaitGroup
 	)
 	f := func() {
-		//do nothing
+		//schedule nothing
 	}
 	//创建jobsNum个任务，每个任务都会间隔[1,2)秒内执行一次
 	for i := 0; i < jobsNum; i++ {
@@ -208,50 +207,74 @@ func TestClock_AddJobs(t *testing.T) {
 	}
 }
 
-//TestClock_AddEvent200kJob 测试20万条任务下，其中任意一条数据从加入到执行的时间延迟，是否超过约定的最大值
+//TestClock_Delay_200kJob 测试20万条任务下，其中任意一条数据从加入到执行的时间延迟，是否超过约定的最大值
 // 目标：
-// 	1.按照10k次/秒的任务频率，延时超过200µs的不得超过2%。
-//	2.不得有任何一条事件提醒，延时超过100ms。
+//	1.不得有任何一条事件提醒，延时超过2s，即平均延时在10µs内。
 // Note:笔记本(尤其是windows操作系统）可能无法通过测试
-func TestClock_AddEvent200kJob(t *testing.T) {
+func TestClock_Delay_200kJob(t *testing.T) {
 	var (
-		jobsNum              = 200000 //添加任务数量
-		beyondCounter  = &Counter{}
-		wg            sync.WaitGroup
-		interval      = time.Microsecond * 100
-		delay1        = time.Microsecond * 200 //适度允许的小延时
-		delay2        = time.Millisecond * 100 //不允许出现的最大延时
-		myClock       = NewClock()
+		jobsNum     = 200000 //添加任务数量
+		myClock     = NewClock()
+		jobInterval = time.Second
+		mut         sync.Mutex
+		maxDelay    int64
 	)
-	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
-	//按照每秒10k次，间隔100µs一条。
-	for i := 0; i < jobsNum; i++ {
-		jobInterval := time.Second + time.Duration(i)*interval
-		job, inserted := myClock.AddJobWithTimeout(jobInterval, nil)
-		if !inserted {
-			t.Error("任务添加存在问题")
-			break
+	start := time.Now().Add(time.Second)
+
+	fn := func() {
+		delay := time.Now().Sub(start).Nanoseconds()
+		if delay > maxDelay {
+			mut.Lock()
+			maxDelay = delay
+			mut.Unlock()
 		}
-		wg.Add(1)
-		go func() {
-			event := <-job.C()
-			if event.delay().Nanoseconds() > delay1.Nanoseconds() {
-				beyondCounter.AddOne()
-			}
-			if event.delay().Nanoseconds() > delay2.Nanoseconds() {
-				t.Fatalf("事件提醒延时=%vµs,超过误差最大允许值%vµs:\njobItem%+v\n", event.delay().Nanoseconds()/1000, delay2.Nanoseconds()/1000, event)
-			}
-			wg.Done()
-		}()
 	}
-	wg.Wait()
+
+	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
+	for i := 0; i < jobsNum; i++ {
+		myClock.AddJobWithTimeout(jobInterval, fn)
+
+	}
+	time.Sleep(time.Second * 3)
 	if jobsNum != int(myClock.Counter()) {
 		t.Errorf("应该执行%v次，实际执行%v次。所有值应该相等。\n", jobsNum, myClock.Counter())
 	}
-	if beyondCounter.Count()*100/jobsNum >= 2 {
-		t.Errorf("超时任务数=%v,超过了总数%v的2%%。/n", beyondCounter.Count(), jobsNum)
+	if maxDelay > (time.Second * 2).Nanoseconds() {
+		t.Errorf("超过了允许的最大时间%v秒，实际耗时:%v ms\n", time.Second*2, maxDelay/1e6)
 	}
+	//t.Logf("实际耗时:%vms \n", maxDelay/1e6)
+
 }
+// test miniheap ,compare performance
+//func TestClock_Delay_100kJob1(t *testing.T) {
+//	var (
+//		jobsNum     = 100000 //添加任务数量
+//		myClock     = NewTimer()
+//		jobInterval = time.Second
+//		mut         sync.Mutex
+//		maxDelay    int64
+//	)
+//	start := time.Now().Add(time.Second)
+//	fn := func() {
+//		delay := time.Now().Sub(start).Nanoseconds()
+//		if delay > maxDelay {
+//			mut.Lock()
+//			maxDelay = delay
+//			mut.Unlock()
+//		}
+//	}
+//	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
+//	for i := 0; i < jobsNum; i++ {
+//		myClock.NewItem(jobInterval, fn)
+//
+//	}
+//	time.Sleep(time.Second * 2)
+//	if maxDelay > (time.Second * 2).Nanoseconds() {
+//		t.Errorf("超过了允许的最大时间%v秒，实际耗时:%v ms\n", time.Second*2, maxDelay/1e6)
+//	}
+//	t.Logf("实际耗时:%vms \n", maxDelay/1e6)
+//
+//}
 
 //TestClock_DelJob 检测待运行任务中，能否随机删除一条任务。
 func TestClock_DelJob(t *testing.T) {
@@ -279,37 +302,6 @@ func TestClock_DelJob(t *testing.T) {
 	}
 }
 
-// TestJob_Delay 判断延时是否存在超过100ms
-func TestJob_Delay(t *testing.T) {
-	var (
-		jobsNum  = 100000 //添加任务数量
-		wg       sync.WaitGroup
-		interval = time.Microsecond * 100
-		myClock  = NewClock()
-	)
-
-	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
-	//按照每秒10k次，间隔100µs一条。
-	for i := 0; i < jobsNum; i++ {
-		jobInterval := time.Second + time.Duration(i)*interval
-		job, inserted := myClock.AddJobWithTimeout(jobInterval, nil)
-		if !inserted {
-			t.Error("任务添加存在问题")
-			break
-		}
-		wg.Add(1)
-		go func() {
-			<-job.C()
-			if job.delay().Seconds() > 0.01 {
-				t.Error("存在延时超过100ms极限的情况：", job.delay().Seconds())
-			}
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-
-}
-
 //TestClock_DelJobs 本测试主要检测添加、删除任务的性能。保证每秒1万次新增+删除操作。
 func TestClock_DelJobs(t *testing.T) {
 	//思路：
@@ -332,8 +324,8 @@ func TestClock_DelJobs(t *testing.T) {
 
 	myClock.DelJobs(wantdeljobs)
 
-	if 0 != int(myClock.Counter()) || myClock.WaitJobs() != 0 || myClock.jobList.Len()-1 != 0 {
-		t.Errorf("应该执行%v次，实际执行%v次,此时任务队列中残余记录,myClock.actionindex.len=%v,jobList.len=%v\n", jobsNum-len(wantdeljobs), myClock.Counter(), myClock.WaitJobs(), myClock.jobList.Len()-1)
+	if 0 != int(myClock.Counter()) || myClock.WaitJobs() != 0 || myClock.jobList.Len() != 0 {
+		t.Errorf("应该执行%v次，实际执行%v次,此时任务队列中残余记录,myClock.actionindex.len=%v,jobList.len=%v\n", jobsNum-len(wantdeljobs), myClock.Counter(), myClock.WaitJobs(), myClock.jobList.Len())
 
 	}
 }

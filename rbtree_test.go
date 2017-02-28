@@ -18,8 +18,8 @@ func newOnceJob(delay time.Duration) jobItem {
 	now := time.Now()
 	job := jobItem{
 		createTime:   now,
-		IntervalTime: delay,
-		f: func() {
+		intervalTime: delay,
+		fn: func() {
 			fmt.Println("临时任务事件")
 		},
 	}
@@ -40,7 +40,7 @@ func TestRbtree_Insert(t *testing.T) {
 	tree := rbtree.New()
 	for i := 0; i < size; i++ {
 		items[i] = newOnceJob(time.Duration(i * 1000))
-		items[i].actionTime = items[i].createTime.Add(items[i].IntervalTime)
+		items[i].actionTime = items[i].createTime.Add(items[i].intervalTime)
 		tree.Insert(items[i])
 
 	}
@@ -67,7 +67,7 @@ func TestRbtree_Delete(t *testing.T) {
 
 	for i := 0; i < size; i++ {
 		item := newOnceJob(time.Duration(i * 1000))
-		item.actionTime = item.createTime.Add(item.IntervalTime)
+		item.actionTime = item.createTime.Add(item.intervalTime)
 		items[i] = &item
 		tree.Insert(&item)
 		//t.Logf("itmes[%v]:%+v \n",i,item)
