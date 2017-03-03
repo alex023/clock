@@ -22,8 +22,8 @@ package clock
 import (
 	"github.com/HuKeping/rbtree"
 	"math"
-	"time"
 	"sync"
+	"time"
 )
 
 const _UNTOUCHED = time.Duration(math.MaxInt64)
@@ -32,21 +32,19 @@ type JobType int
 
 // Clock 任务队列的控制器
 type Clock struct {
-	mut      sync.Mutex
-	seq      uint64
-	jobIndex map[uint64]*jobItem //缓存任务id-jobItem
-	jobList  *rbtree.Rbtree      //job索引，定位撤销通道
-	times    uint64              //最多执行次数
-	counter  uint64              //已执行次数，不得大于times
-	timer    *time.Timer         //计时器
+	mut     sync.Mutex
+	seq     uint64
+	jobList *rbtree.Rbtree //job索引，定位撤销通道
+	times   uint64         //最多执行次数
+	counter uint64         //已执行次数，不得大于times
+	timer   *time.Timer    //计时器
 }
 
 //NewClock Create a task queue controller
 func NewClock() *Clock {
 	clock := &Clock{
-		jobList:  rbtree.New(),
-		jobIndex: make(map[uint64]*jobItem),
-		timer:    time.NewTimer(_UNTOUCHED),
+		jobList: rbtree.New(),
+		timer:   time.NewTimer(_UNTOUCHED),
 	}
 
 	//开启守护协程
@@ -105,32 +103,29 @@ func (jl *Clock) AddJobWithTimeout(timeout time.Duration, jobFunc func()) (job J
 }
 
 // AddJobWithTimeout update a timed task with time duration after now
-//	@jobId:		job Unique identifier
+//	@job:		job identifier
 //	@timeout:	new job schedule time
-func (jl *Clock) UpdateJobTimeout(jobId uint64, timeout time.Duration) (job Job, updated bool) {
+func (jl *Clock) UpdateJobTimeout(job Job, timeout time.Duration) (updated bool) {
 	if timeout.Nanoseconds() <= 0 {
-		return nil, false
+		return false
 	}
 	now := time.Now()
 
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	jobitem, founded := jl.jobIndex[jobId]
-	if !founded {
-		//job=nil
-		//update=false
-		return
+	item, ok := job.(*jobItem)
+	if !ok {
+		return false
 	}
 	// update jobitem rbtree node
-	jl.jobList.Delete(jobitem)
-	jobitem.actionTime = now.Add(timeout)
-	jl.jobList.Insert(jobitem)
+	jl.jobList.Delete(item)
+	item.actionTime = now.Add(timeout)
+	jl.jobList.Insert(item)
 
-	jl.timeRefreshAfterAdd(jobitem)
+	jl.timeRefreshAfterAdd(item)
 
 	updated = true
-	job = jobitem
 	return
 }
 func (jl *Clock) timeRefreshAfterDel() {
@@ -173,12 +168,12 @@ func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job J
 
 // AddJobRepeat add a repeat task with interval duration
 //	@jobInterval:	The two time interval operation
-//	@jobTimes:	Execution times
-//	@jobFunc:	Exectuion funciton
+//	@jobTimes:	The number of job execution
+//	@jobFunc:	The funciton of job exectuion
 //	return
-// 	@job:	返还注册的任务事件。
+// 	@job:		job interface。
 //Note：
-// 对于times为0的任务，在不使用时，务必调用DelJob，以释放。
+// when jobTimes==0,the job will be executed without limitation。If you no longer use, be sure to call the DelJob method to release
 func (jl *Clock) AddJobRepeat(jobInterval time.Duration, jobTimes uint64, jobFunc func()) (job Job, inserted bool) {
 	if jobInterval.Nanoseconds() <= 0 {
 		return nil, false
@@ -206,7 +201,6 @@ func (jl *Clock) addJob(createTime time.Time, jobInterval time.Duration, jobTime
 		msgChan:      make(chan Job, 10),
 		fn:           jobFunc,
 	}
-	jl.jobIndex[job.id] = job
 	jl.jobList.Insert(job)
 
 	return
@@ -214,8 +208,8 @@ func (jl *Clock) addJob(createTime time.Time, jobInterval time.Duration, jobTime
 }
 
 // DelJob Deletes the task that has been added to the task queue. If the key does not exist, return false.
-func (jl *Clock) DelJob(jobId uint64) (deleted bool) {
-	if jobId < 0 {
+func (jl *Clock) DelJob(job Job) (deleted bool) {
+	if job == nil {
 		deleted = false
 		return
 	}
@@ -223,11 +217,11 @@ func (jl *Clock) DelJob(jobId uint64) (deleted bool) {
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	job, founded := jl.jobIndex[jobId]
-	if !founded {
-		return
+	item, ok := job.(*jobItem)
+	if !ok {
+		return false
 	}
-	jl.removeJob(job)
+	jl.removeJob(item)
 	deleted = true
 
 	jl.timeRefreshAfterDel()
@@ -235,26 +229,26 @@ func (jl *Clock) DelJob(jobId uint64) (deleted bool) {
 	return
 }
 
-// DelJobs 向任务队列中批量删除给定key!=""的任务事件。
-func (jl *Clock) DelJobs(jobIds []uint64) {
+// DelJobs remove jobs from clock schedule list
+func (jl *Clock) DelJobs(jobIds []Job) {
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	for _, jobId := range jobIds {
-		job, founded := jl.jobIndex[jobId]
-		if founded {
-			jl.removeJob(job)
+	for _, job := range jobIds {
+		item, ok := job.(*jobItem)
+		if !ok {
+			continue
 		}
+		jl.removeJob(item)
 	}
 
 	jl.timeRefreshAfterDel()
 
 	return
 }
-func (jl *Clock) removeJob(job *jobItem) {
-	jl.jobList.Delete(job)
-	delete(jl.jobIndex, job.Id())
-	close(job.msgChan)
+func (jl *Clock) removeJob(item *jobItem) {
+	jl.jobList.Delete(item)
+	close(item.msgChan)
 
 	return
 }
@@ -269,9 +263,9 @@ func (jl *Clock) Counter() uint64 {
 
 //WaitJobs 待执行任务数
 // Note:每次使用，对任务队列会有微秒级的阻塞
-func (jl *Clock) WaitJobs() int {
+func (jl *Clock) WaitJobs() uint {
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	return len(jl.jobIndex)
+	return jl.jobList.Len()
 }

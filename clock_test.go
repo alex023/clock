@@ -1,16 +1,17 @@
 package clock
 
 import (
-	"time"
+	"math"
 	"math/rand"
 	"sync"
 	"testing"
-	"math"
+	"time"
 )
 
 var (
 	r = rand.New(rand.NewSource(time.Now().Unix()))
 )
+
 //_Counter 支持并发的计数器
 type _Counter struct {
 	sync.Mutex
@@ -83,7 +84,7 @@ func TestClock_WaitJobs(t *testing.T) {
 	if myClock.WaitJobs() != 1 {
 		t.Error("数据列表操作获取的数据与Clock实际情况不一致！")
 	}
-	myClock.DelJob(job.Id())
+	myClock.DelJob(job)
 
 }
 
@@ -136,17 +137,17 @@ func TestClock_AddRepeatJob2(t *testing.T) {
 			}
 		}
 	}()
-	call1, inserted1 := myClock.AddJobRepeat(interval1, 0, func() { jobFunc(1) })
+	event1, inserted1 := myClock.AddJobRepeat(interval1, 0, func() { jobFunc(1) })
 	time.Sleep(time.Millisecond * 10)
-	call2, inserted2 := myClock.AddJobRepeat(interval2, 0, func() { jobFunc(2) })
+	event2, inserted2 := myClock.AddJobRepeat(interval2, 0, func() { jobFunc(2) })
 
 	if !inserted1 || !inserted2 {
 		t.Error("任务初始化失败，没有添加成功")
 	}
 	time.Sleep(time.Second)
 
-	myClock.DelJob(call1.Id())
-	myClock.DelJob(call2.Id())
+	myClock.DelJob(event1)
+	myClock.DelJob(event2)
 
 }
 
@@ -245,6 +246,7 @@ func TestClock_Delay_200kJob(t *testing.T) {
 	//t.Logf("实际耗时:%vms \n", maxDelay/1e6)
 
 }
+
 // test miniheap ,compare performance
 //func TestClock_Delay_100kJob1(t *testing.T) {
 //	var (
@@ -295,8 +297,8 @@ func TestClock_DelJob(t *testing.T) {
 		jobs[i] = job
 	}
 
-	deleted := myClock.DelJob(jobs[delmod].Id())
-	if !deleted || myClock.WaitJobs() != jobsNum-1 {
+	deleted := myClock.DelJob(jobs[delmod])
+	if !deleted || myClock.WaitJobs() != uint(jobsNum-1) {
 		t.Errorf("任务删除%v，删除后，应该只剩下%v条任务，实际还有%v条\n", deleted, myClock.Counter(), jobsNum-1)
 
 	}
@@ -313,13 +315,13 @@ func TestClock_DelJobs(t *testing.T) {
 		jobsNum     = 20000
 		randscope   = 1 * 1000 * 1000 * 1000
 		jobs        = make([]Job, jobsNum)
-		wantdeljobs = make([]uint64, jobsNum)
+		wantdeljobs = make([]Job, jobsNum)
 	)
 	for i := 0; i < jobsNum; i++ {
 		delay := time.Second + time.Duration(r.Intn(randscope)) //增加一秒作为延迟，以避免删除的时候，已经存在任务被通知执行，导致后续判断失误
 		job, _ := myClock.AddJobWithTimeout(delay, nil)
 		jobs[i] = job
-		wantdeljobs[i] = job.Id()
+		wantdeljobs[i] = job
 	}
 
 	myClock.DelJobs(wantdeljobs)
