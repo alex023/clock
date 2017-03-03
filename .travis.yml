@@ -9,7 +9,7 @@ before_script:
   - go get -t -v github.com/alex023/clock/...
 
 script:
-  - go test -v github.com/alex023/clock/...
+  - go test -v github.com/alex023/clock/
 
 notifications:
   email:
