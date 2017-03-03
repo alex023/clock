@@ -1,11 +1,11 @@
 package clock
 
 import (
+	"fmt"
 	"github.com/HuKeping/rbtree"
 	"log"
 	"testing"
 	"time"
-	"fmt"
 )
 
 //因为采用的第三方实现的红黑树，为确保其功能与性能，进行补充测试。
@@ -14,6 +14,7 @@ var (
 	size = 100
 	//r    = rand.New(rand.NewSource(time.Now().Unix()))
 )
+
 func newOnceJob(delay time.Duration) jobItem {
 	now := time.Now()
 	job := jobItem{
@@ -26,11 +27,11 @@ func newOnceJob(delay time.Duration) jobItem {
 	return job
 }
 func print(item rbtree.Item) bool {
-	job, ok := item.(*jobItem)
+	ite, ok := item.(*jobItem)
 	if !ok {
 		return false
 	}
-	log.Printf("%+v|%+v \n", job.Id(), job.actionTime.String())
+	log.Printf("%+v|%+v \n", ite.id, ite.actionTime.String())
 	return true
 }
 func TestRbtree_Insert(t *testing.T) {

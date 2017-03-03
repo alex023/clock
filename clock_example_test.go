@@ -2,9 +2,9 @@ package clock
 
 import (
 	"fmt"
-	"time"
 	"log"
 	"sync"
+	"time"
 )
 
 //ExampleClock_Repeat1 基于函数回调，一个对重复任务的使用演示。
@@ -33,7 +33,7 @@ func ExampleClock_Repeat1() {
 
 	//等待阻塞信号
 	<-sigalChan
-	myClock.DelJob(event.Id())
+	myClock.DelJob(event)
 
 	//休眠1秒，判断任务是否真正注销
 	time.Sleep(time.Second)
@@ -100,7 +100,7 @@ func ExampleClock_Once2() {
 
 	//任务执行前，撤销任务
 	time.Sleep(time.Millisecond * 300)
-	myClock.DelJob(job.Id())
+	myClock.DelJob(job)
 
 	//等待2秒，正常情况下，事件不会再执行
 	time.Sleep(2 * time.Second)

@@ -1,13 +1,12 @@
 package clock
 
 import (
-	"time"
 	"github.com/HuKeping/rbtree"
+	"time"
 )
 
 // Job External access interface for timed tasks
 type Job interface {
-	Id() uint64    //Id get job's uninque id which clock assign
 	C() <-chan Job //C Get a Chan，which can get message if Job is executed
 	Count() uint64 //计数器，表示已执行（或触发）的次数
 	Times() uint64 //允许执行的最大次数
@@ -15,7 +14,7 @@ type Job interface {
 
 // jobItem implementation of "Job" and "rbtree.Item"
 type jobItem struct {
-	id           uint64        //唯一键值，删除或更新需要该参数。由控制器创建,可以通过Id()获取
+	id           uint64        //唯一键值，内部由管理器生成，以区分同一时刻的不同任务事件
 	times        uint64        //允许执行的最大次数
 	count        uint64        //计数器，表示已执行（或触发）的次数
 	intervalTime time.Duration //间隔时间
@@ -37,11 +36,6 @@ func (je jobItem) Less(another rbtree.Item) bool {
 	return je.id < item.id
 }
 
-//Id implement for Job
-func (je *jobItem) Id() uint64 {
-	return je.id
-}
-
 //C implement for Job
 func (je *jobItem) C() <-chan Job {
 	return je.msgChan
@@ -61,7 +55,7 @@ func (je *jobItem) done() {
 	select {
 	case je.msgChan <- je:
 	default:
-	//some times,client should not receive msgChan,so must discard jobItem when blocking
+		//some times,client should not receive msgChan,so must discard jobItem when blocking
 	}
 }
 func (je *jobItem) canContinue() bool {
@@ -71,12 +65,13 @@ func (je *jobItem) canContinue() bool {
 	return je.times > je.count
 
 }
+
 // Count implement for Job
 func (je jobItem) Count() uint64 {
 	return je.count
 }
+
 // Times implement for Job
 func (je jobItem) Times() uint64 {
 	return je.times
 }
-
