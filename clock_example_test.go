@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-//ExampleClock_Repeat1 基于函数回调，一个对重复任务的使用演示。
-func ExampleClock_Repeat1() {
+//ExampleClock_AddJobRepeat 基于函数回调，一个对重复任务的使用演示。
+func ExampleClock_AddJobRepeat() {
 	var (
 		myClock   = NewClock()
 		counter   = 0
@@ -44,9 +44,9 @@ func ExampleClock_Repeat1() {
 	//schedule repeat
 }
 
-//ExampleClock_Repeat2 ，基于函数回调，演示添加有次数限制的重复任务
+//ExampleClock_AddJobRepeat2 ，基于函数回调，演示添加有次数限制的重复任务
 //  执行3次之后，撤销定时事件
-func ExampleClock_Repeat2() {
+func ExampleClock_AddJobRepeat2() {
 	var (
 		myClock = NewClock()
 	)
@@ -67,8 +67,8 @@ func ExampleClock_Repeat2() {
 	//schedule repeat
 }
 
-//ExampleClock_Once 基于函数回调，对一次性任务正常使用的演示。
-func ExampleClock_Once() {
+//ExampleClock_AddJobWithTimeout 基于函数回调，对一次性任务正常使用的演示。
+func ExampleClock_AddJobWithTimeout() {
 	var (
 		jobClock = NewClock()
 		jobFunc  = func() {
@@ -86,8 +86,8 @@ func ExampleClock_Once() {
 	//schedule once
 }
 
-//ExampleClock_Once2 基于事件提醒，对一次性任务中途放弃的使用演示。
-func ExampleClock_Once2() {
+//ExampleClock_AddJobWithDeadtime 基于事件提醒，对一次性任务中途放弃的使用演示。
+func ExampleClock_AddJobWithDeadtime() {
 	var (
 		myClock = NewClock()
 		jobFunc = func() {
