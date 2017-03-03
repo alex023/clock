@@ -29,8 +29,8 @@ func (counter *_Counter) Count() int {
 
 func TestClock_Create(t *testing.T) {
 	myClock := NewClock()
-	if myClock.WaitJobs() != 0 || myClock.Counter() != 0 {
-		t.Errorf("JobList init have error.len=%d,count=%d", myClock.WaitJobs(), myClock.Counter())
+	if myClock.WaitJobs() != 0 || myClock.Count() != 0 {
+		t.Errorf("JobList init have error.len=%d,count=%d", myClock.WaitJobs(), myClock.Count())
 		//joblist.Debug()
 	}
 
@@ -57,8 +57,8 @@ func TestClock_AddOnceJob(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	if myClock.Counter() != 1 {
-		t.Errorf("任务执行存在问题，应该执行%d次,实际执行%d次", 1, myClock.Counter())
+	if myClock.Count() != 1 {
+		t.Errorf("任务执行存在问题，应该执行%d次,实际执行%d次", 1, myClock.Count())
 	}
 }
 
@@ -109,7 +109,7 @@ func TestClock_AddRepeatJob(t *testing.T) {
 	}
 	//重复任务的方法是协程调用，可能还没有执行，job.C就已经退出，需要阻塞观察
 	time.Sleep(time.Second)
-	if int(myClock.Counter()) != counter.Count() || counter.Count() != int(jobsNum) {
+	if int(myClock.Count()) != counter.Count() || counter.Count() != int(jobsNum) {
 		t.Errorf("任务添加存在问题,应该%v次，实际执行%v\n", jobsNum, counter.Count())
 	}
 
@@ -203,8 +203,8 @@ func TestClock_AddJobs(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	if jobsNum != int(myClock.Counter()) || jobsNum != counter.Count() {
-		t.Errorf("应该执行%v次，实际执行%v次,外部信号接受到%v次。\n", jobsNum, myClock.Counter(), counter.Count())
+	if jobsNum != int(myClock.Count()) || jobsNum != counter.Count() {
+		t.Errorf("应该执行%v次，实际执行%v次,外部信号接受到%v次。\n", jobsNum, myClock.Count(), counter.Count())
 	}
 }
 
@@ -237,8 +237,8 @@ func TestClock_Delay_200kJob(t *testing.T) {
 
 	}
 	time.Sleep(time.Second * 3)
-	if jobsNum != int(myClock.Counter()) {
-		t.Errorf("应该执行%v次，实际执行%v次。所有值应该相等。\n", jobsNum, myClock.Counter())
+	if jobsNum != int(myClock.Count()) {
+		t.Errorf("应该执行%v次，实际执行%v次。所有值应该相等。\n", jobsNum, myClock.Count())
 	}
 	if maxDelay > (time.Second * 2).Nanoseconds() {
 		t.Errorf("超过了允许的最大时间%v秒，实际耗时:%v ms\n", time.Second*2, maxDelay/1e6)
@@ -299,7 +299,7 @@ func TestClock_DelJob(t *testing.T) {
 
 	deleted := myClock.DelJob(jobs[delmod])
 	if !deleted || myClock.WaitJobs() != uint(jobsNum-1) {
-		t.Errorf("任务删除%v，删除后，应该只剩下%v条任务，实际还有%v条\n", deleted, myClock.Counter(), jobsNum-1)
+		t.Errorf("任务删除%v，删除后，应该只剩下%v条任务，实际还有%v条\n", deleted, myClock.Count(), jobsNum-1)
 
 	}
 }
@@ -326,8 +326,8 @@ func TestClock_DelJobs(t *testing.T) {
 
 	myClock.DelJobs(wantdeljobs)
 
-	if 0 != int(myClock.Counter()) || myClock.WaitJobs() != 0 || myClock.jobList.Len() != 0 {
-		t.Errorf("应该执行%v次，实际执行%v次,此时任务队列中残余记录,myClock.actionindex.len=%v,jobList.len=%v\n", jobsNum-len(wantdeljobs), myClock.Counter(), myClock.WaitJobs(), myClock.jobList.Len())
+	if 0 != int(myClock.Count()) || myClock.WaitJobs() != 0 || myClock.jobList.Len() != 0 {
+		t.Errorf("应该执行%v次，实际执行%v次,此时任务队列中残余记录,myClock.actionindex.len=%v,jobList.len=%v\n", jobsNum-len(wantdeljobs), myClock.Count(), myClock.WaitJobs(), myClock.jobList.Len())
 
 	}
 }

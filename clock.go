@@ -30,13 +30,12 @@ const _UNTOUCHED = time.Duration(math.MaxInt64)
 
 type JobType int
 
-// Clock 任务队列的控制器
+// Clock is joblist control
 type Clock struct {
 	mut     sync.Mutex
 	seq     uint64
-	jobList *rbtree.Rbtree //job索引，定位撤销通道
-	times   uint64         //最多执行次数
-	counter uint64         //已执行次数，不得大于times
+	jobList *rbtree.Rbtree //inner memory storage
+	count   uint64         //已执行次数，不得大于times
 	timer   *time.Timer    //计时器
 }
 
@@ -62,7 +61,7 @@ func (jl *Clock) schedule() {
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	jl.counter++
+	jl.count++
 
 	if item := jl.jobList.Min(); item != nil {
 		job := item.(*jobItem)
@@ -145,7 +144,7 @@ func (jl *Clock) timeRefreshAfterAdd(new *jobItem) {
 
 // AddJobWithDeadtime insert a timed task with time point after now
 //	@timeaction:	Execution start time. must after now,else return false
-//	@jobFunc:	Exectuion function
+//	@jobFunc:	Execution function
 //	return
 // 	@job:		返还注册的任务事件。
 func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job Job, inserted bool) {
@@ -169,7 +168,7 @@ func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job J
 // AddJobRepeat add a repeat task with interval duration
 //	@jobInterval:	The two time interval operation
 //	@jobTimes:	The number of job execution
-//	@jobFunc:	The funciton of job exectuion
+//	@jobFunc:	The function of job execution
 //	return
 // 	@job:		job interface。
 //Note：
@@ -253,12 +252,12 @@ func (jl *Clock) removeJob(item *jobItem) {
 	return
 }
 
-// count 已经执行的任务数。对于重复任务，会计算多次
-func (jl *Clock) Counter() uint64 {
+// Count 已经执行的任务数。对于重复任务，会计算多次
+func (jl *Clock) Count() uint64 {
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	return jl.counter
+	return jl.count
 }
 
 //WaitJobs 待执行任务数

@@ -2,7 +2,7 @@
 [![License](https://img.shields.io/:license-apache-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/alex023/clock)](https://goreportcard.com/report/github.com/alex023/clock)
 [![GoDoc](https://godoc.org/github.com/alex023/clock?status.svg)](https://godoc.org/github.com/alex023/clock)
-[![Build Status](https://travis-ci.org/alex023/clock?status.svg)](https://travis-ci.org/alex023/clock)
+[![Build Status](https://travis-ci.org/alex023/clock.svg?branch=dev)](https://travis-ci.org/alex023/clock)
 [![Coverage Status](https://coveralls.io/repos/github/alex023/clock/badge.svg?branch=dev)](https://coveralls.io/github/alex023/clock?branch=dev)
 
  定时任务消息通知队列，实现了单一timer对多个注册任务的触发调用，其特点在于：

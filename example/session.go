@@ -30,7 +30,7 @@ func NewSession() *Session {
 // AddToken add token string which can release after seconds
 // @interval：	TTL seconds
 // return:
-//	@added:	if add when inserted sucessfull;else updated release time
+//	@added:	if add when inserted successful;else updated release time
 //	@error:	if interval==0
 func (s *Session) AddToken(token string, interval uint64) (added bool, err error) {
 	if interval == 0 {
