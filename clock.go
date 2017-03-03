@@ -1,5 +1,4 @@
-// Package clock
-// 定时任务消息通知队列，实现了单一timer对多个注册任务的触发调用，其特点在于：
+// Package clock is a low consumption, low latency support for frequent updates of large capacity timing manager：
 //	1、能够添加一次性、重复性任务，并能在其执行前撤销或频繁更改。
 //	2、支持同一时间点，多个任务提醒。
 //	3、适用于中等密度，大跨度的单次、多次定时任务。
@@ -28,8 +27,6 @@ import (
 
 const _UNTOUCHED = time.Duration(math.MaxInt64)
 
-type JobType int
-
 // Clock is joblist control
 type Clock struct {
 	mut     sync.Mutex
@@ -41,7 +38,7 @@ type Clock struct {
 
 //NewClock Create a task queue controller
 func NewClock() *Clock {
-	clock := &Clock{
+	c := &Clock{
 		jobList: rbtree.New(),
 		timer:   time.NewTimer(_UNTOUCHED),
 	}
@@ -49,12 +46,12 @@ func NewClock() *Clock {
 	//开启守护协程
 	go func() {
 		for {
-			<-clock.timer.C
-			clock.schedule()
+			<-c.timer.C
+			c.schedule()
 		}
 	}()
 
-	return clock
+	return c
 }
 
 func (jl *Clock) schedule() {
@@ -101,7 +98,7 @@ func (jl *Clock) AddJobWithTimeout(timeout time.Duration, jobFunc func()) (job J
 	return
 }
 
-// AddJobWithTimeout update a timed task with time duration after now
+// UpdateJobTimeout update a timed task with time duration after now
 //	@job:		job identifier
 //	@timeout:	new job schedule time
 func (jl *Clock) UpdateJobTimeout(job Job, timeout time.Duration) (updated bool) {
