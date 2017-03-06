@@ -71,6 +71,7 @@ func (s *Session) GetTokenNum() int {
 
 	return len(s.cache)
 }
+
 //RemoveToken remove token by name from Session
 func (s *Session) RemoveToken(token string) {
 	s.Lock()
