@@ -6,6 +6,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/alex023/clock/badge.svg?branch=dev)](https://coveralls.io/github/alex023/clock?branch=dev)
 
 ## Brief
+----------
  定时任务消息通知队列，实现了单一timer对多个注册任务的触发调用，其特点在于：
 	
     1、能够添加一次性、重复性任务，并能在其执行前频繁撤销或更改。
@@ -27,7 +28,7 @@
 		c、控制器释放该任务
 		d、控制器等待下一个最近需要执行的任务
  
-##Examples
- [示例代码][1]
+## [Examples][1]
+----------
  
  [1]:https://github.com/alex023/clock
