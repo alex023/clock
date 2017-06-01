@@ -57,7 +57,7 @@ func ExampleClock_AddJobRepeat2() {
 	//add in clock,execute three times,interval 200 millisecond
 	_, inserted := myClock.AddJobRepeat(time.Duration(time.Millisecond*200), 3, fn)
 	if !inserted {
-		log.Println("新增事件失败")
+		log.Println("failure")
 	}
 	//wait a second,watching
 	time.Sleep(time.Second)
