@@ -45,7 +45,7 @@ func (s *Session) AddToken(token string, interval uint64) (added bool, err error
 		s.clock.UpdateJobTimeout(item.job, time.Duration(interval)*time.Second)
 		added = false //update token
 	} else {
-		job, _ := s.clock.AddJobWithTimeout(time.Duration(interval)*time.Second, func() { s.RemoveToken(token) })
+		job, _ := s.clock.AddJobWithInterval(time.Duration(interval)*time.Second, func() { s.RemoveToken(token) })
 		item := tokenjob{
 			token: token,
 			job:   job,

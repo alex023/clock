@@ -25,17 +25,17 @@ func ExampleClock_AddJobRepeat() {
 		}
 
 	}
-	//创建一个重复执行的任务，间隔50毫秒
+	//create a task that executes three times,interval 50 millisecond
 	event, inserted := myClock.AddJobRepeat(time.Duration(time.Millisecond*50), 0, fn)
 	if !inserted {
-		log.Println("新增事件失败")
+		log.Println("failure")
 	}
 
 	//等待阻塞信号
 	<-sigalChan
 	myClock.DelJob(event)
 
-	//休眠1秒，判断任务是否真正注销
+	//wait a second,watching
 	time.Sleep(time.Second)
 	//Output:
 	//
@@ -50,15 +50,16 @@ func ExampleClock_AddJobRepeat2() {
 	var (
 		myClock = NewClock()
 	)
-	//创建一个重复执行的任务，定时1秒
+	//define a repeat task
 	fn := func() {
 		fmt.Println("schedule repeat")
 	}
+	//add in clock,execute three times,interval 200 millisecond
 	_, inserted := myClock.AddJobRepeat(time.Duration(time.Millisecond*200), 3, fn)
 	if !inserted {
 		log.Println("新增事件失败")
 	}
-
+	//wait a second,watching
 	time.Sleep(time.Second)
 	//Output:
 	//
@@ -75,10 +76,10 @@ func ExampleClock_AddJobWithTimeout() {
 			fmt.Println("schedule once")
 		}
 	)
-	//创建一个一次性任务，定时1毫秒
-	jobClock.AddJobWithTimeout(time.Duration(100*time.Millisecond), jobFunc)
+	//add a task that executes once,interval 100 millisecond
+	jobClock.AddJobWithInterval(time.Duration(100*time.Millisecond), jobFunc)
 
-	//等待1秒，看看足够的时间条件下，事件是否会执行多次
+	//wait a second,watching
 	time.Sleep(1 * time.Second)
 
 	//Output:
