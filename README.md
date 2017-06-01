@@ -9,10 +9,10 @@
  Timing task manager based on red black tree in memory
  
 # Feature
- - support task function call, and event notifications。
+ - support task function call, and event notifications
  - support task that executes once or several times
  - support task cancel which added
- - 100k/s execution, reminder, undo, or add operation
+ - 100k/s execution,  add  or remove task operation
      
  # Example
  ## add a task that executes once
@@ -46,9 +46,9 @@
     	//add in clock,execute three times,interval 200 millisecond
     	_, inserted := myClock.AddJobRepeat(time.Duration(time.Millisecond*200), 3, fn)
     	if !inserted {
-    		log.Println("新增事件失败")
+    		log.Println("failure")
     	}
-    
+     	//wait a second,watching 
     	time.Sleep(time.Second)
     	//Output:
     	//
