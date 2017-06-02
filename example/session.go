@@ -34,7 +34,7 @@ func NewSession() *Session {
 //	@error:	if interval==0
 func (s *Session) AddToken(token string, interval uint64) (added bool, err error) {
 	if interval == 0 {
-		err = errors.New("interval cannot be zero!")
+		err = errors.New("interval cannot be zero")
 		return
 	}
 	s.Lock()
@@ -45,7 +45,7 @@ func (s *Session) AddToken(token string, interval uint64) (added bool, err error
 		s.clock.UpdateJobTimeout(item.job, time.Duration(interval)*time.Second)
 		added = false //update token
 	} else {
-		job, _ := s.clock.AddJobWithInterval(time.Duration(interval)*time.Second, func() { s.RemoveToken(token) })
+		job, _ := s.clock.AddJobWithTimeout(time.Duration(interval)*time.Second, func() { s.RemoveToken(token) })
 		item := tokenjob{
 			token: token,
 			job:   job,
@@ -64,12 +64,15 @@ func (s *Session) GetToken(token string) bool {
 	return founded
 }
 
+//GetTokenNum return numbers of tokens in Session
 func (s *Session) GetTokenNum() int {
 	s.Lock()
 	defer s.Unlock()
 
 	return len(s.cache)
 }
+
+//RemoveToken remove token by name from Session
 func (s *Session) RemoveToken(token string) {
 	s.Lock()
 	defer s.Unlock()

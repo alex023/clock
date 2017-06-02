@@ -68,8 +68,8 @@ func ExampleClock_AddJobRepeat2() {
 	//schedule repeat
 }
 
-//ExampleClock_AddJobWithTimeout 基于函数回调，对一次性任务正常使用的演示。
-func ExampleClock_AddJobWithTimeout() {
+//ExampleClock_AddJobWithInterval 基于函数回调，对一次性任务正常使用的演示。
+func ExampleClock_AddJobWithInterval() {
 	var (
 		jobClock = NewClock()
 		jobFunc  = func() {
