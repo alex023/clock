@@ -47,11 +47,11 @@ func TestClock_AddOnceJob(t *testing.T) {
 	)
 
 	//插入时间间隔≤0，应该不允许添加
-	if _, inserted := myClock.AddJobWithTimeout(0, jobFunc); inserted {
+	if _, inserted := myClock.AddJobWithInterval(0, jobFunc); inserted {
 		t.Error("任务添加失败，加入了间隔时间≤0的任务。")
 	}
 
-	if _, inserted := myClock.AddJobWithTimeout(interval, jobFunc); !inserted {
+	if _, inserted := myClock.AddJobWithInterval(interval, jobFunc); !inserted {
 		t.Error("任务添加失败，未加入任务。")
 	}
 
@@ -164,7 +164,7 @@ func TestClock_AddMixJob(t *testing.T) {
 	f2 := func() {
 		counter2++
 	}
-	_, inserted1 := myClock.AddJobWithTimeout(time.Millisecond*500, f1)
+	_, inserted1 := myClock.AddJobWithInterval(time.Millisecond*500, f1)
 	_, inserted2 := myClock.AddJobRepeat(time.Millisecond*300, 0, f2)
 
 	if !inserted1 && !inserted2 {
@@ -190,7 +190,7 @@ func TestClock_AddJobs(t *testing.T) {
 	}
 	//创建jobsNum个任务，每个任务都会间隔[1,2)秒内执行一次
 	for i := 0; i < jobsNum; i++ {
-		job, inserted := myClock.AddJobWithTimeout(time.Second+time.Duration(r.Intn(randscope)), f)
+		job, inserted := myClock.AddJobWithInterval(time.Second+time.Duration(r.Intn(randscope)), f)
 		if !inserted {
 			t.Error("任务添加存在问题")
 			break
@@ -234,7 +234,7 @@ func TestClock_Delay_200kJob(t *testing.T) {
 
 	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
 	for i := 0; i < jobsNum; i++ {
-		myClock.AddJobWithTimeout(jobInterval, fn)
+		myClock.AddJobWithInterval(jobInterval, fn)
 
 	}
 	time.Sleep(time.Second * 3)
@@ -294,7 +294,7 @@ func TestClock_DelJob(t *testing.T) {
 	)
 	for i := 0; i < jobsNum; i++ {
 		delay := time.Second + time.Duration(r.Intn(randscope)) //增加一秒作为延迟，以避免删除的时候，已经存在任务被通知执行，导致后续判断失误
-		job, _ := myClock.AddJobWithTimeout(delay, nil)
+		job, _ := myClock.AddJobWithInterval(delay, nil)
 		jobs[i] = job
 	}
 
@@ -320,7 +320,7 @@ func TestClock_DelJobs(t *testing.T) {
 	)
 	for i := 0; i < jobsNum; i++ {
 		delay := time.Second + time.Duration(r.Intn(randscope)) //增加一秒作为延迟，以避免删除的时候，已经存在任务被通知执行，导致后续判断失误
-		job, _ := myClock.AddJobWithTimeout(delay, nil)
+		job, _ := myClock.AddJobWithInterval(delay, nil)
 		jobs[i] = job
 		wantdeljobs[i] = job
 	}
@@ -337,7 +337,7 @@ func BenchmarkClock_AddJob(b *testing.B) {
 	myClock := NewClock()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		newjob, inserted := myClock.AddJobWithTimeout(time.Millisecond*5, nil)
+		newjob, inserted := myClock.AddJobWithInterval(time.Millisecond*5, nil)
 		if !inserted {
 			b.Error("can not insert jobItem")
 			break

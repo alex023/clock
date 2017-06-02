@@ -77,27 +77,6 @@ func (jl *Clock) schedule() {
 	}
 }
 
-// AddJobWithTimeout insert a timed task with time duration after now
-// 	@timeout:	duration after now
-//	@jobFunc:	action function
-//	return
-// 	@job:
-func (jl *Clock) AddJobWithTimeout(timeout time.Duration, jobFunc func()) (job Job, inserted bool) {
-	if timeout.Nanoseconds() <= 0 {
-		return nil, false
-	}
-	now := time.Now()
-
-	jl.mut.Lock()
-
-	newitem, inserted := jl.addJob(now, timeout, 1, jobFunc)
-	jl.timeRefreshAfterAdd(newitem)
-
-	jl.mut.Unlock()
-	job = newitem
-	return
-}
-
 // UpdateJobTimeout update a timed task with time duration after now
 //	@job:		job identifier
 //	@timeout:	new job schedule time
@@ -137,6 +116,27 @@ func (jl *Clock) timeRefreshAfterAdd(new *jobItem) {
 		jl.timer.Reset(item.actionTime.Sub(time.Now()))
 	}
 
+}
+
+// AddJobWithInterval insert a timed task with time duration after now
+// 	@timeout:	duration after now
+//	@jobFunc:	action function
+//	return
+// 	@job:
+func (jl *Clock) AddJobWithInterval(timeout time.Duration, jobFunc func()) (job Job, inserted bool) {
+	if timeout.Nanoseconds() <= 0 {
+		return nil, false
+	}
+	now := time.Now()
+
+	jl.mut.Lock()
+
+	newitem, inserted := jl.addJob(now, timeout, 1, jobFunc)
+	jl.timeRefreshAfterAdd(newitem)
+
+	jl.mut.Unlock()
+	job = newitem
+	return
 }
 
 // AddJobWithDeadtime insert a timed task with time point after now
