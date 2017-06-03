@@ -27,6 +27,20 @@ import (
 
 const _UNTOUCHED = time.Duration(math.MaxInt64)
 
+var (
+	defaultClock *Clock
+	oncedo       sync.Once
+)
+
+//Default return singal default clock
+func Default() *Clock {
+	oncedo.Do(initClock)
+	return defaultClock
+}
+func initClock() {
+	defaultClock = NewClock()
+}
+
 // Clock is joblist control
 type Clock struct {
 	mut     sync.Mutex
