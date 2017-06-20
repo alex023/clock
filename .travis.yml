@@ -2,7 +2,7 @@ language: go
 
 
 go:
-  - 1.8.3
+  - 1.8.x
 
 before_script:
   - go get -t -v github.com/alex023/clock/...
