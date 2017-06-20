@@ -261,9 +261,7 @@ func TestClock_DelJobs(t *testing.T) {
 	}
 }
 
-//TestClock_Delay_200kJob 测试20万条任务下，其中任意一条数据从加入到执行的时间延迟，是否超过约定的最大值
-// 目标：
-//	1.不得有任何一条事件提醒，延时超过2s，即平均延时在10µs内。
+//TestClock_Delay_200kJob 测试2秒内能否执行20万条任务。
 // Note:笔记本(尤其是windows操作系统）,云服务可能无法通过测试
 func TestClock_Delay_200kJob(t *testing.T) {
 	var (

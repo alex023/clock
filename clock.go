@@ -60,8 +60,7 @@ func NewClock() *Clock {
 
 	//开启守护协程
 	go func() {
-		for {
-			<-c.timer.C
+		for _ = range c.timer.C {
 			c.schedule()
 		}
 	}()

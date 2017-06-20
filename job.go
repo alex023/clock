@@ -59,14 +59,6 @@ func (je *jobItem) done() {
 	}
 }
 
-//func (je *jobItem) canContinue() bool {
-//	if je.times == 0 {
-//		return true
-//	}
-//	return je.times > je.count
-//
-//}
-
 // Count implement for Job
 func (je jobItem) Count() uint64 {
 	return je.count
