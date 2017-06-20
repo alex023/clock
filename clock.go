@@ -22,6 +22,7 @@ import (
 	"github.com/HuKeping/rbtree"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -72,12 +73,12 @@ func (jl *Clock) schedule() {
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	jl.count++
+	atomic.AddUint64(&jl.count, 1)
 
 	if item := jl.jobList.Min(); item != nil {
 		job := item.(*jobItem)
 		job.done()
-		if job.canContinue() {
+		if job.times == 0 || job.times > job.count {
 			jl.jobList.Delete(job)
 			job.actionTime = job.actionTime.Add(job.intervalTime)
 			jl.jobList.Insert(job)
@@ -265,10 +266,27 @@ func (jl *Clock) removeJob(item *jobItem) {
 
 // Count 已经执行的任务数。对于重复任务，会计算多次
 func (jl *Clock) Count() uint64 {
+	return atomic.LoadUint64(&jl.count)
+}
+
+//重置Clock的内部状态
+func (jl *Clock) Reset() *Clock {
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	return jl.count
+	jl.timer.Reset(_UNTOUCHED)
+	jl.count = 0
+
+	item := jl.jobList.Min()
+	for item != nil {
+		job, ok := item.(*jobItem)
+		if ok {
+			jl.removeJob(job)
+		}
+		item = jl.jobList.Min()
+	}
+
+	return jl
 }
 
 //WaitJobs 待执行任务数

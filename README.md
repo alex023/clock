@@ -18,7 +18,7 @@
  ## add a task that executes once
  ```golang
     var (
- 		myClock = Default()
+ 		myClock = NewClock()
  		jobFunc  = func() {
  			fmt.Println("schedule once")
  		}
@@ -37,7 +37,7 @@
  ```golang
  func ExampleClock_AddJobRepeat() {
  	var (
-    		myClock = Default()
+    		myClock = NewClock()
     	)
     	//define a repeat task 
     	fn := func() {
@@ -61,7 +61,7 @@
  ```golang
 func ExampleClock_RmJob(){
 	var (
-		myClock = Default()
+		myClock = NewClock()
 		count int
 		jobFunc = func() {
 			count++

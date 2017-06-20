@@ -10,7 +10,7 @@ import (
 //ExampleClock_AddJobRepeat 基于函数回调，一个对重复任务的使用演示。
 func ExampleClock_AddJobRepeat() {
 	var (
-		myClock   = Default()
+		myClock   = NewClock()
 		counter   = 0
 		mut       sync.Mutex
 		sigalChan = make(chan struct{}, 0)
@@ -48,7 +48,7 @@ func ExampleClock_AddJobRepeat() {
 //  执行3次之后，撤销定时事件
 func ExampleClock_AddJobRepeat2() {
 	var (
-		myClock = Default()
+		myClock = NewClock()
 	)
 	//define a repeat task
 	fn := func() {
@@ -71,7 +71,7 @@ func ExampleClock_AddJobRepeat2() {
 //ExampleClock_AddJobWithInterval 基于函数回调，对一次性任务正常使用的演示。
 func ExampleClock_AddJobWithInterval() {
 	var (
-		jobClock = Default()
+		jobClock = NewClock()
 		jobFunc  = func() {
 			fmt.Println("schedule once")
 		}
@@ -113,7 +113,7 @@ func ExampleClock_AddJobWithDeadtime() {
 
 func ExampleClock_RmJob() {
 	var (
-		myClock = Default()
+		myClock = NewClock()
 		count   int
 		jobFunc = func() {
 			count++
@@ -127,10 +127,13 @@ func ExampleClock_RmJob() {
 	time.Sleep(time.Millisecond * 500)
 	myClock.DelJob(job)
 
-	//等待3秒，正常情况下，事件不会再执行
-	time.Sleep(3 * time.Second)
+	//等待2秒，正常情况下，事件不会再执行
+	time.Sleep(2 * time.Second)
 
+	//再次添加一个任务，病观察
+	myClock.AddJobRepeat(time.Second*1, 1, jobFunc)
+	time.Sleep(time.Second * 2)
 	//Output:
 	//
-	//
+	//do  1
 }
