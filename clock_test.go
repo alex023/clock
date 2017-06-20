@@ -213,7 +213,6 @@ func TestClock_AddJobs(t *testing.T) {
 //	1.不得有任何一条事件提醒，延时超过2s，即平均延时在10µs内。
 // Note:笔记本(尤其是windows操作系统）,云服务可能无法通过测试
 func TestClock_Delay_200kJob(t *testing.T) {
-	t.Skip()
 	var (
 		jobsNum     = 200000 //添加任务数量
 		myClock     = NewClock()
@@ -244,7 +243,6 @@ func TestClock_Delay_200kJob(t *testing.T) {
 	if maxDelay > (time.Second * 2).Nanoseconds() {
 		t.Errorf("超过了允许的最大时间%v秒，实际耗时:%v ms\n", time.Second*2, maxDelay/1e6)
 	}
-	//t.Logf("实际耗时:%vms \n", maxDelay/1e6)
 
 }
 
