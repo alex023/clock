@@ -1,7 +1,6 @@
 package clock
 
 import (
-	"math"
 	"math/rand"
 	"sync"
 	"testing"
@@ -28,7 +27,7 @@ func (counter *_Counter) Count() int {
 }
 
 func TestClock_Create(t *testing.T) {
-	myClock := NewClock()
+	myClock := Default().Reset()
 	if myClock.WaitJobs() != 0 || myClock.Count() != 0 {
 		t.Errorf("JobList init have error.len=%d,count=%d", myClock.WaitJobs(), myClock.Count())
 		//joblist.Debug()
@@ -40,7 +39,7 @@ func TestClock_AddOnceJob(t *testing.T) {
 	var (
 		randscope = 50 * 1000 * 1000 //随机范围
 		interval  = time.Millisecond*100 + time.Duration(r.Intn(randscope))
-		myClock   = NewClock()
+		myClock   = Default().Reset()
 		jobFunc   = func() {
 			//fmt.Println("任务事件")
 		}
@@ -65,7 +64,7 @@ func TestClock_AddOnceJob(t *testing.T) {
 //TestClock_WaitJobs 测试当前待执行任务列表中的事件
 func TestClock_WaitJobs(t *testing.T) {
 	var (
-		myClock   = NewClock()
+		myClock   = Default().Reset()
 		randscope = 50 * 1000 * 1000 //随机范围
 		interval  = time.Millisecond*50 + time.Duration(r.Intn(randscope))
 		jobFunc   = func() {
@@ -91,8 +90,8 @@ func TestClock_WaitJobs(t *testing.T) {
 //TestClock_AddRepeatJob 测试重复任务定时执行情况
 func TestClock_AddRepeatJob(t *testing.T) {
 	var (
-		myClock   = NewClock()
-		jobsNum   = uint64(1000)                                            //执行次数
+		myClock   = Default().Reset()
+		jobsNum   = 1000                                                    //执行次数
 		randscope = 50 * 1000                                               //随机范围
 		interval  = time.Microsecond*100 + time.Duration(r.Intn(randscope)) //100-150µs时间间隔
 		counter   = new(_Counter)
@@ -100,7 +99,7 @@ func TestClock_AddRepeatJob(t *testing.T) {
 	f := func() {
 		counter.AddOne()
 	}
-	job, inserted := myClock.AddJobRepeat(interval, jobsNum, f)
+	job, inserted := myClock.AddJobRepeat(interval, uint64(jobsNum), f)
 	if !inserted {
 		t.Error("任务初始化失败，任务事件没有添加成功")
 	}
@@ -109,8 +108,8 @@ func TestClock_AddRepeatJob(t *testing.T) {
 	}
 	//重复任务的方法是协程调用，可能还没有执行，job.C就已经退出，需要阻塞观察
 	time.Sleep(time.Second)
-	if int(myClock.Count()) != counter.Count() || counter.Count() != int(jobsNum) {
-		t.Errorf("任务添加存在问题,应该%v次，实际执行%v\n", jobsNum, counter.Count())
+	if int(myClock.Count()) != jobsNum || counter.Count() != jobsNum {
+		t.Errorf("任务添加存在问题,应该%v次，实际执行%v\n", myClock.count, counter.Count())
 	}
 
 }
@@ -118,7 +117,7 @@ func TestClock_AddRepeatJob(t *testing.T) {
 //TestClock_AddRepeatJob2 测试间隔时间不同的两个重复任务，是否会交错执行
 func TestClock_AddRepeatJob2(t *testing.T) {
 	var (
-		myClock    = NewClock()
+		myClock    = Default().Reset()
 		interval1  = time.Millisecond * 20 //间隔20毫秒
 		interval2  = time.Millisecond * 20 //间隔20毫秒
 		singalChan = make(chan int, 10)
@@ -154,7 +153,7 @@ func TestClock_AddRepeatJob2(t *testing.T) {
 //TestClock_AddMixJob 测试一次性任务+重复性任务的运行撤销情况
 func TestClock_AddMixJob(t *testing.T) {
 	var (
-		myClock  = NewClock()
+		myClock  = Default().Reset()
 		counter1 int
 		counter2 int
 	)
@@ -181,7 +180,7 @@ func TestClock_AddJobs(t *testing.T) {
 	var (
 		jobsNum   = 200000                 //添加任务数量
 		randscope = 1 * 1000 * 1000 * 1000 //随机范围1秒
-		myClock   = NewClock()
+		myClock   = Default().Reset()
 		counter   = &_Counter{}
 		wg        sync.WaitGroup
 	)
@@ -208,77 +207,6 @@ func TestClock_AddJobs(t *testing.T) {
 	}
 }
 
-//TestClock_Delay_200kJob 测试20万条任务下，其中任意一条数据从加入到执行的时间延迟，是否超过约定的最大值
-// 目标：
-//	1.不得有任何一条事件提醒，延时超过2s，即平均延时在10µs内。
-// Note:笔记本(尤其是windows操作系统）,云服务可能无法通过测试
-func TestClock_Delay_200kJob(t *testing.T) {
-	t.Skip()
-	var (
-		jobsNum     = 200000 //添加任务数量
-		myClock     = NewClock()
-		jobInterval = time.Second
-		mut         sync.Mutex
-		maxDelay    int64
-	)
-	start := time.Now().Add(time.Second)
-
-	fn := func() {
-		delay := time.Now().Sub(start).Nanoseconds()
-		if delay > maxDelay {
-			mut.Lock()
-			maxDelay = delay
-			mut.Unlock()
-		}
-	}
-
-	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
-	for i := 0; i < jobsNum; i++ {
-		myClock.AddJobWithInterval(jobInterval, fn)
-
-	}
-	time.Sleep(time.Second * 3)
-	if jobsNum != int(myClock.Count()) {
-		t.Errorf("应该执行%v次，实际执行%v次。所有值应该相等。\n", jobsNum, myClock.Count())
-	}
-	if maxDelay > (time.Second * 2).Nanoseconds() {
-		t.Errorf("超过了允许的最大时间%v秒，实际耗时:%v ms\n", time.Second*2, maxDelay/1e6)
-	}
-	//t.Logf("实际耗时:%vms \n", maxDelay/1e6)
-
-}
-
-// test miniheap ,compare performance
-//func TestClock_Delay_100kJob1(t *testing.T) {
-//	var (
-//		jobsNum     = 100000 //添加任务数量
-//		myClock     = NewTimer()
-//		jobInterval = time.Second
-//		mut         sync.Mutex
-//		maxDelay    int64
-//	)
-//	start := time.Now().Add(time.Second)
-//	fn := func() {
-//		delay := time.Now().Sub(start).Nanoseconds()
-//		if delay > maxDelay {
-//			mut.Lock()
-//			maxDelay = delay
-//			mut.Unlock()
-//		}
-//	}
-//	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
-//	for i := 0; i < jobsNum; i++ {
-//		myClock.NewItem(jobInterval, fn)
-//
-//	}
-//	time.Sleep(time.Second * 2)
-//	if maxDelay > (time.Second * 2).Nanoseconds() {
-//		t.Errorf("超过了允许的最大时间%v秒，实际耗时:%v ms\n", time.Second*2, maxDelay/1e6)
-//	}
-//	t.Logf("实际耗时:%vms \n", maxDelay/1e6)
-//
-//}
-
 //TestClock_DelJob 检测待运行任务中，能否随机删除一条任务。
 func TestClock_DelJob(t *testing.T) {
 	//思路：
@@ -290,7 +218,7 @@ func TestClock_DelJob(t *testing.T) {
 		randscope = 1 * 1000 * 1000 * 1000
 		jobs      = make([]Job, jobsNum)
 		delmod    = r.Intn(jobsNum)
-		myClock   = NewClock()
+		myClock   = Default().Reset()
 	)
 	for i := 0; i < jobsNum; i++ {
 		delay := time.Second + time.Duration(r.Intn(randscope)) //增加一秒作为延迟，以避免删除的时候，已经存在任务被通知执行，导致后续判断失误
@@ -312,7 +240,7 @@ func TestClock_DelJobs(t *testing.T) {
 	//在一秒内，删除所有的任务。
 	//如果执行次数！=0，说明一秒内无法满足对应条数的增删
 	var (
-		myClock     = NewClock()
+		myClock     = NewClock().Reset()
 		jobsNum     = 20000
 		randscope   = 1 * 1000 * 1000 * 1000
 		jobs        = make([]Job, jobsNum)
@@ -333,27 +261,38 @@ func TestClock_DelJobs(t *testing.T) {
 	}
 }
 
+//TestClock_Delay_200kJob 测试2秒内能否执行20万条任务。
+// Note:笔记本(尤其是windows操作系统）,云服务可能无法通过测试
+func TestClock_Delay_200kJob(t *testing.T) {
+	var (
+		jobsNum     = 200000 //添加任务数量
+		myClock     = Default().Reset()
+		jobInterval = time.Second
+	)
+	fn := func() {
+		//do nothing
+	}
+
+	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
+	for i := 0; i < jobsNum; i++ {
+		myClock.AddJobWithInterval(jobInterval, fn)
+
+	}
+
+	time.Sleep(time.Second * 3)
+	if jobsNum != int(myClock.Count()) {
+		t.Errorf("应该执行%v次，实际执行%v次。\n", jobsNum, myClock.Count())
+	}
+}
+
 func BenchmarkClock_AddJob(b *testing.B) {
-	myClock := NewClock()
+	myClock := NewClock().Reset()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		newjob, inserted := myClock.AddJobWithInterval(time.Millisecond*5, nil)
+		_, inserted := myClock.AddJobWithInterval(time.Second*5, nil)
 		if !inserted {
 			b.Error("can not insert jobItem")
 			break
 		}
-		<-newjob.C()
-	}
-}
-
-// 测试通道消息传送的时间消耗
-func BenchmarkChan(b *testing.B) {
-	tmpChan := make(chan time.Duration, 1)
-	maxnum := int64(math.MaxInt64)
-	for i := 0; i < b.N; i++ {
-		dur := time.Duration(maxnum - time.Now().UnixNano())
-		tmpChan <- dur
-		<-tmpChan
-
 	}
 }

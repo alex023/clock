@@ -90,7 +90,7 @@ func ExampleClock_AddJobWithInterval() {
 //ExampleClock_AddJobWithDeadtime 基于事件提醒，对一次性任务中途放弃的使用演示。
 func ExampleClock_AddJobWithDeadtime() {
 	var (
-		myClock = NewClock()
+		myClock = Default()
 		jobFunc = func() {
 			fmt.Println("schedule once")
 		}
@@ -109,4 +109,31 @@ func ExampleClock_AddJobWithDeadtime() {
 	//Output:
 	//
 	//
+}
+
+func ExampleClock_RmJob() {
+	var (
+		myClock = NewClock()
+		count   int
+		jobFunc = func() {
+			count++
+			fmt.Println("do ", count)
+		}
+	)
+	//创建任务，间隔1秒，执行两次
+	job, _ := myClock.AddJobRepeat(time.Second*1, 2, jobFunc)
+
+	//任务执行前，撤销任务
+	time.Sleep(time.Millisecond * 500)
+	myClock.DelJob(job)
+
+	//等待2秒，正常情况下，事件不会再执行
+	time.Sleep(2 * time.Second)
+
+	//再次添加一个任务，病观察
+	myClock.AddJobRepeat(time.Second*1, 1, jobFunc)
+	time.Sleep(time.Second * 2)
+	//Output:
+	//
+	//do  1
 }

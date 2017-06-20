@@ -58,13 +58,6 @@ func (je *jobItem) done() {
 		//some times,client should not receive msgChan,so must discard jobItem when blocking
 	}
 }
-func (je *jobItem) canContinue() bool {
-	if je.times == 0 {
-		return true
-	}
-	return je.times > je.count
-
-}
 
 // Count implement for Job
 func (je jobItem) Count() uint64 {

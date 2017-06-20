@@ -18,7 +18,7 @@
  ## add a task that executes once
  ```golang
     var (
- 		jobClock = NewClock()
+ 		myClock = NewClock()
  		jobFunc  = func() {
  			fmt.Println("schedule once")
  		}
@@ -57,6 +57,32 @@
     	//schedule repeat
  }
  ```
+ ## rm  a task before its execution
+ ```golang
+func ExampleClock_RmJob(){
+	var (
+		myClock = NewClock()
+		count int
+		jobFunc = func() {
+			count++
+			fmt.Println("do ",count)
+		}
+	)
+	//创建任务，间隔1秒，执行两次
+	job, _ := myClock.AddJobRepeat(time.Second*1,2, jobFunc)
+
+	//任务执行前，撤销任务
+	time.Sleep(time.Millisecond*500)
+	myClock.DelJob(job)
+
+	//等待3秒，正常情况下，事件不会再执行
+	time.Sleep(3 * time.Second)
+
+	//Output:
+	//
+	//
+}
+```
  ## more examples
  ### [event notify][1]
  ### [TTL Session][2] 

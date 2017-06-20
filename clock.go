@@ -22,6 +22,7 @@ import (
 	"github.com/HuKeping/rbtree"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -59,8 +60,7 @@ func NewClock() *Clock {
 
 	//开启守护协程
 	go func() {
-		for {
-			<-c.timer.C
+		for _ = range c.timer.C {
 			c.schedule()
 		}
 	}()
@@ -72,12 +72,12 @@ func (jl *Clock) schedule() {
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	jl.count++
+	atomic.AddUint64(&jl.count, 1)
 
 	if item := jl.jobList.Min(); item != nil {
 		job := item.(*jobItem)
 		job.done()
-		if job.canContinue() {
+		if job.times == 0 || job.times > job.count {
 			jl.jobList.Delete(job)
 			job.actionTime = job.actionTime.Add(job.intervalTime)
 			jl.jobList.Insert(job)
@@ -155,9 +155,9 @@ func (jl *Clock) AddJobWithInterval(timeout time.Duration, jobFunc func()) (job 
 
 // AddJobWithDeadtime insert a timed task with time point after now
 //	@timeaction:	Execution start time. must after now,else return false
-//	@jobFunc:	Execution function
+//	@jobFunc:		Execution function
 //	return
-// 	@job:		返还注册的任务事件。
+// 	@job:			Job interface.
 func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job Job, inserted bool) {
 	timeout := timeaction.Sub(time.Now())
 	if timeout.Nanoseconds() <= 0 {
@@ -181,7 +181,7 @@ func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job J
 //	@jobTimes:	The number of job execution
 //	@jobFunc:	The function of job execution
 //	return
-// 	@job:		job interface。
+// 	@job:		Job interface.
 //Note：
 // when jobTimes==0,the job will be executed without limitation。If you no longer use, be sure to call the DelJob method to release
 func (jl *Clock) AddJobRepeat(jobInterval time.Duration, jobTimes uint64, jobFunc func()) (job Job, inserted bool) {
@@ -265,10 +265,27 @@ func (jl *Clock) removeJob(item *jobItem) {
 
 // Count 已经执行的任务数。对于重复任务，会计算多次
 func (jl *Clock) Count() uint64 {
+	return atomic.LoadUint64(&jl.count)
+}
+
+//重置Clock的内部状态
+func (jl *Clock) Reset() *Clock {
 	jl.mut.Lock()
 	defer jl.mut.Unlock()
 
-	return jl.count
+	jl.timer.Reset(_UNTOUCHED)
+	jl.count = 0
+
+	item := jl.jobList.Min()
+	for item != nil {
+		job, ok := item.(*jobItem)
+		if ok {
+			jl.removeJob(job)
+		}
+		item = jl.jobList.Min()
+	}
+
+	return jl
 }
 
 //WaitJobs 待执行任务数
