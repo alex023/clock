@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -217,17 +218,14 @@ func TestClock_Delay_200kJob(t *testing.T) {
 		jobsNum     = 200000 //添加任务数量
 		myClock     = NewClock()
 		jobInterval = time.Second
-		mut         sync.Mutex
 		maxDelay    int64
 	)
 	start := time.Now().Add(time.Second)
 
 	fn := func() {
 		delay := time.Now().Sub(start).Nanoseconds()
-		if delay > maxDelay {
-			mut.Lock()
-			maxDelay = delay
-			mut.Unlock()
+		if atomic.LoadInt64(&maxDelay) < delay {
+			atomic.StoreInt64(&maxDelay, delay)
 		}
 	}
 
@@ -238,7 +236,7 @@ func TestClock_Delay_200kJob(t *testing.T) {
 	}
 	time.Sleep(time.Second * 3)
 	if jobsNum != int(myClock.Count()) {
-		t.Errorf("应该执行%v次，实际执行%v次。所有值应该相等。\n", jobsNum, myClock.Count())
+		t.Errorf("应该执行%v次，实际执行%v次。\n", jobsNum, myClock.Count())
 	}
 	if maxDelay > (time.Second * 2).Nanoseconds() {
 		t.Errorf("超过了允许的最大时间%v秒，实际耗时:%v ms\n", time.Second*2, maxDelay/1e6)
