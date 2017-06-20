@@ -155,9 +155,9 @@ func (jl *Clock) AddJobWithInterval(timeout time.Duration, jobFunc func()) (job 
 
 // AddJobWithDeadtime insert a timed task with time point after now
 //	@timeaction:	Execution start time. must after now,else return false
-//	@jobFunc:	Execution function
+//	@jobFunc:		Execution function
 //	return
-// 	@job:		返还注册的任务事件。
+// 	@job:			Job interface.
 func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job Job, inserted bool) {
 	timeout := timeaction.Sub(time.Now())
 	if timeout.Nanoseconds() <= 0 {
@@ -181,7 +181,7 @@ func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job J
 //	@jobTimes:	The number of job execution
 //	@jobFunc:	The function of job execution
 //	return
-// 	@job:		job interface。
+// 	@job:		Job interface.
 //Note：
 // when jobTimes==0,the job will be executed without limitation。If you no longer use, be sure to call the DelJob method to release
 func (jl *Clock) AddJobRepeat(jobInterval time.Duration, jobTimes uint64, jobFunc func()) (job Job, inserted bool) {
