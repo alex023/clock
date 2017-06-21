@@ -267,7 +267,7 @@ func TestClock_DelJobs(t *testing.T) {
 func TestClock_Delay_200kJob(t *testing.T) {
 	var (
 		jobsNum     = 200000 //添加任务数量
-		myClock     = Default().Reset()
+		myClock     = NewClock()
 		jobInterval = time.Second
 	)
 	fn := func() {

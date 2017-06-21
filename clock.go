@@ -19,7 +19,6 @@
 package clock
 
 import (
-	"fmt"
 	"github.com/HuKeping/rbtree"
 	"math"
 	"sync"
@@ -74,7 +73,7 @@ func (jl *Clock) start() {
 		createTime:   time.Now(),
 		intervalTime: time.Duration(math.MaxInt64),
 		fn: func() {
-			fmt.Println("this jobItem is untouched!")
+			//this jobItem is untouched.
 		},
 	}
 
@@ -322,22 +321,26 @@ func (jl *Clock) cleanJobs() {
 	}
 }
 
-//WaitJobs 待执行任务数
+//WaitJobs get how much jobs waiting for call
 func (jl *Clock) WaitJobs() uint {
-	return jl.jobList.Len() - 1
+	tmp := jl.jobList.Len() - 1
+	if tmp > 0 {
+		return tmp
+	}
+	return 0
 }
 
-//Stop 停止定时器的执行，里边未完成任务将会取消执行
+//Stop stop clock , and cancel all waiting jobs
 func (jl *Clock) Stop() {
-	jl.exitChan <- singal
+	jl.exit()
 
 	jl.cleanJobs()
 }
 
-//StopGracefull 停止定时器，并将定时器中的待执行任务立即执行一次
+//StopGracefull stop clock ,and do once every waiting job
 //Note:对于任务队列中，即使安排执行多次或者不限次数的，也仅仅执行一次。
 func (jl *Clock) StopGracefull() {
-	jl.exitChan <- singal
+	jl.exit()
 
 	jl.immediate()
 }
