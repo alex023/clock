@@ -86,5 +86,5 @@ func ExampleClock_RmJob(){
  ## more examples
  ### [event notify][1]
  ### [TTL Session][2] 
- [1]: https://github.com/alex023/clock/blob/master/clock_example_test.go#L11 
+ [1]: https://github.com/alex023/clock/blob/master/clock_example_test.go#L33-L61 
  [2]: https://github.com/alex023/clock/blob/master/example/session.go
