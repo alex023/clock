@@ -28,13 +28,13 @@ func NewSession() *Session {
 }
 
 // AddToken add token string which can release after seconds
-// @interval：	TTL seconds
+// @interval：	Token of the survival time
 // return:
-//	@added:	if add when inserted successful;else updated release time
-//	@error:	if interval==0
-func (s *Session) AddToken(token string, interval uint64) (added bool, err error) {
-	if interval == 0 {
-		err = errors.New("interval cannot be zero")
+//	@added:		return true if add as new,else return false
+//	@error:		if interval==0
+func (s *Session) AddToken(token string, timeout time.Duration) (added bool, err error) {
+	if timeout == 0 {
+		err = errors.New("timeout cannot be zero")
 		return
 	}
 	s.Lock()
@@ -42,16 +42,20 @@ func (s *Session) AddToken(token string, interval uint64) (added bool, err error
 
 	item, founded := s.cache[token]
 	if founded {
-		s.clock.UpdateJobTimeout(item.job, time.Duration(interval)*time.Second)
+		s.clock.UpdateJobTimeout(item.job, timeout)
 		added = false //update token
+		fmt.Printf("%v| [updated] token [%v] duration=[%2d] \n", time.Now().Format("15:04:05"), token, int(timeout.Seconds()))
+
 	} else {
-		job, _ := s.clock.AddJobWithInterval(time.Duration(interval)*time.Second, func() { s.RemoveToken(token) })
+		job, _ := s.clock.AddJobWithInterval(timeout, func() { s.RemoveToken(token) })
 		item := tokenjob{
 			token: token,
 			job:   job,
 		}
 		s.cache[token] = item
 		added = true
+		//output for example
+		fmt.Printf("%v| [ added ] token [%v] duration=[%2d] \n", time.Now().Format("15:04:05"), token, int(timeout.Seconds()))
 	}
 	return
 }
@@ -76,27 +80,30 @@ func (s *Session) GetTokenNum() int {
 func (s *Session) RemoveToken(token string) {
 	s.Lock()
 	defer s.Unlock()
-	fmt.Println("token:", token, " is removed!@", time.Now().Format("15:04:05:00")) //just for watching
+	fmt.Printf("%v| [removed] token [%v] by TTLSession \n", time.Now().Format("15:04:05"), token)
 	delete(s.cache, token)
 }
 
 func main() {
 	session := NewSession()
-	fmt.Println("test add token,and ttl can action")
-	session.AddToken("alex023", 3)
-	for i := 0; i < 3; i++ {
-		time.Sleep(time.Second * 2)
-		fmt.Printf("%v|session have %2d tokens,found token=alex023 %v \n", time.Now().Format("15:04:05"), session.GetTokenNum(), session.GetToken("alex023"))
+
+	token1 := "alex023_1"
+	fmt.Println("add token and timeout")
+	session.AddToken(token1, time.Second*3)
+	for i := 0; i < 5; i++ {
+		time.Sleep(time.Second * 1)
+		fmt.Printf("%v|[watching] token [%v] founded=%v\n", time.Now().Format("15:04:05"), token1, session.GetToken(token1))
 	}
 	fmt.Println()
 
-	fmt.Println("test add token and update it")
-	session.AddToken("alex023_2", 4)
-	for i := 0; i < 5; i++ {
+	token2 := "alex023_2"
+	fmt.Println("add token and update it before timeout")
+	session.AddToken(token2, time.Second*3)
+	for i := 0; i < 10; i++ {
 		time.Sleep(time.Second * 1)
 		if i == 1 {
-			session.AddToken("alex023_2", 5)
+			session.AddToken(token2, time.Second*5)
 		}
-		fmt.Printf("%v|session have %2d tokens,found token=alex023_2 %v \n", time.Now().Format("15:04:05"), session.GetTokenNum(), session.GetToken("alex023_2"))
+		fmt.Printf("%v|[watching] token [%v] founded=%v\n", time.Now().Format("15:04:05"), token2, session.GetToken(token2))
 	}
 }
