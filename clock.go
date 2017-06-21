@@ -19,6 +19,7 @@
 package clock
 
 import (
+	"fmt"
 	"github.com/HuKeping/rbtree"
 	"math"
 	"sync"
@@ -44,64 +45,118 @@ func initClock() {
 
 // Clock is joblist control
 type Clock struct {
-	mut     sync.Mutex
-	seq     uint64
-	jobList *rbtree.Rbtree //inner memory storage
-	count   uint64         //已执行次数，不得大于times
-	timer   *time.Timer    //计时器
+	//mut     sync.Mutex
+	seq        uint64
+	jobList    *rbtree.Rbtree //inner memory storage
+	count      uint64         //已执行次数，不得大于times
+	pauseChan  chan struct{}
+	resumeChan chan struct{}
+	exitChan   chan struct{}
 }
+
+var singal = struct{}{}
 
 //NewClock Create a task queue controller
 func NewClock() *Clock {
 	c := &Clock{
-		jobList: rbtree.New(),
-		timer:   time.NewTimer(_UNTOUCHED),
+		jobList:    rbtree.New(),
+		pauseChan:  make(chan struct{}, 0),
+		resumeChan: make(chan struct{}, 0),
+		exitChan:   make(chan struct{}, 0),
 	}
 
-	//开启守护协程
-	go func() {
-		for _ = range c.timer.C {
-			c.schedule()
-		}
-	}()
+	c.start()
 
 	return c
 }
+func (jl *Clock) start() {
+	untouchedJob := jobItem{
+		createTime:   time.Now(),
+		intervalTime: time.Duration(math.MaxInt64),
+		fn: func() {
+			fmt.Println("this jobItem is untouched!")
+		},
+	}
+
+	now := time.Now()
+	_, inserted := jl.addJob(now, untouchedJob.intervalTime, 1, untouchedJob.fn)
+	if !inserted {
+		panic("NewClock")
+	}
+	//开启守护协程
+	go jl.schedule()
+	jl.resume()
+}
+
+func (jl *Clock) pause() {
+	jl.pauseChan <- singal
+}
+func (jl *Clock) resume() {
+	jl.resumeChan <- singal
+}
+func (jl *Clock) exit() {
+	jl.exitChan <- singal
+}
+
+func (jl *Clock) immediate() {
+	for {
+		if item := jl.jobList.Min(); item != nil {
+			atomic.AddUint64(&jl.count, 1)
+
+			job := item.(*jobItem)
+			job.done()
+
+			jl.removeJob(job)
+
+		} else {
+			break
+		}
+	}
+}
 
 func (jl *Clock) schedule() {
-	jl.mut.Lock()
-	defer jl.mut.Unlock()
+	timer := time.NewTimer(_UNTOUCHED)
+	defer timer.Stop()
+Pause:
+	<-jl.resumeChan
+	for {
+		v := jl.jobList.Min()
+		job, _ := v.(*jobItem) //ignore ok-assert
+		timeout := job.actionTime.Sub(time.Now())
+		timer.Reset(timeout)
+		select {
+		case <-timer.C:
+			jl.count++
 
-	atomic.AddUint64(&jl.count, 1)
+			job.done()
 
-	if item := jl.jobList.Min(); item != nil {
-		job := item.(*jobItem)
-		job.done()
-		if job.times == 0 || job.times > job.count {
-			jl.jobList.Delete(job)
-			job.actionTime = job.actionTime.Add(job.intervalTime)
-			jl.jobList.Insert(job)
-		} else {
-			jl.removeJob(job)
+			if job.times == 0 || job.times > job.count {
+				jl.jobList.Delete(job)
+				job.actionTime = job.actionTime.Add(job.intervalTime)
+				jl.jobList.Insert(job)
+			} else {
+				jl.removeJob(job)
+			}
+		case <-jl.pauseChan:
+			goto Pause
+		case <-jl.exitChan:
+			goto Exit
 		}
-
-		jl.timeRefreshAfterDel()
-	} else {
-		jl.timer.Reset(_UNTOUCHED)
 	}
+Exit:
 }
 
 // UpdateJobTimeout update a timed task with time duration after now
 //	@job:		job identifier
-//	@timeout:	new job schedule time
+//	@timeout:	new job schedule time,must be greater than 0
 func (jl *Clock) UpdateJobTimeout(job Job, timeout time.Duration) (updated bool) {
 	if timeout.Nanoseconds() <= 0 {
 		return false
 	}
 	now := time.Now()
 
-	jl.mut.Lock()
-	defer jl.mut.Unlock()
+	jl.pause()
+	defer jl.resume()
 
 	item, ok := job.(*jobItem)
 	if !ok {
@@ -112,24 +167,8 @@ func (jl *Clock) UpdateJobTimeout(job Job, timeout time.Duration) (updated bool)
 	item.actionTime = now.Add(timeout)
 	jl.jobList.Insert(item)
 
-	jl.timeRefreshAfterAdd(item)
-
 	updated = true
 	return
-}
-func (jl *Clock) timeRefreshAfterDel() {
-	if head := jl.jobList.Min(); head != nil {
-		item := head.(*jobItem)
-		jl.timer.Reset(item.actionTime.Sub(time.Now()))
-	}
-
-}
-func (jl *Clock) timeRefreshAfterAdd(new *jobItem) {
-	if head := jl.jobList.Min(); head != nil && head == new {
-		item := head.(*jobItem)
-		jl.timer.Reset(item.actionTime.Sub(time.Now()))
-	}
-
 }
 
 // AddJobWithInterval insert a timed task with time duration after now
@@ -143,12 +182,12 @@ func (jl *Clock) AddJobWithInterval(timeout time.Duration, jobFunc func()) (job 
 	}
 	now := time.Now()
 
-	jl.mut.Lock()
+	jl.pause()
 
 	newitem, inserted := jl.addJob(now, timeout, 1, jobFunc)
-	jl.timeRefreshAfterAdd(newitem)
 
-	jl.mut.Unlock()
+	jl.resume()
+
 	job = newitem
 	return
 }
@@ -165,12 +204,11 @@ func (jl *Clock) AddJobWithDeadtime(timeaction time.Time, jobFunc func()) (job J
 	}
 	now := time.Now()
 
-	jl.mut.Lock()
+	jl.pause()
 
 	newItem, inserted := jl.addJob(now, timeout, 1, jobFunc)
-	jl.timeRefreshAfterAdd(newItem)
 
-	jl.mut.Unlock()
+	jl.resume()
 
 	job = newItem
 	return
@@ -190,10 +228,10 @@ func (jl *Clock) AddJobRepeat(jobInterval time.Duration, jobTimes uint64, jobFun
 	}
 	now := time.Now()
 
-	jl.mut.Lock()
+	jl.pause()
 	newItem, inserted := jl.addJob(now, jobInterval, jobTimes, jobFunc)
-	jl.timeRefreshAfterAdd(newItem)
-	jl.mut.Unlock()
+
+	jl.resume()
 
 	job = newItem
 	return
@@ -224,8 +262,8 @@ func (jl *Clock) DelJob(job Job) (deleted bool) {
 		return
 	}
 
-	jl.mut.Lock()
-	defer jl.mut.Unlock()
+	jl.pause()
+	defer jl.resume()
 
 	item, ok := job.(*jobItem)
 	if !ok {
@@ -234,15 +272,13 @@ func (jl *Clock) DelJob(job Job) (deleted bool) {
 	jl.removeJob(item)
 	deleted = true
 
-	jl.timeRefreshAfterDel()
-
 	return
 }
 
 // DelJobs remove jobs from clock schedule list
 func (jl *Clock) DelJobs(jobIds []Job) {
-	jl.mut.Lock()
-	defer jl.mut.Unlock()
+	jl.pause()
+	defer jl.resume()
 
 	for _, job := range jobIds {
 		item, ok := job.(*jobItem)
@@ -251,8 +287,6 @@ func (jl *Clock) DelJobs(jobIds []Job) {
 		}
 		jl.removeJob(item)
 	}
-
-	jl.timeRefreshAfterDel()
 
 	return
 }
@@ -270,12 +304,14 @@ func (jl *Clock) Count() uint64 {
 
 //重置Clock的内部状态
 func (jl *Clock) Reset() *Clock {
-	jl.mut.Lock()
-	defer jl.mut.Unlock()
-
-	jl.timer.Reset(_UNTOUCHED)
+	jl.exit()
 	jl.count = 0
 
+	jl.cleanJobs()
+	jl.start()
+	return jl
+}
+func (jl *Clock) cleanJobs() {
 	item := jl.jobList.Min()
 	for item != nil {
 		job, ok := item.(*jobItem)
@@ -284,15 +320,24 @@ func (jl *Clock) Reset() *Clock {
 		}
 		item = jl.jobList.Min()
 	}
-
-	return jl
 }
 
 //WaitJobs 待执行任务数
-// Note:每次使用，对任务队列会有微秒级的阻塞
 func (jl *Clock) WaitJobs() uint {
-	jl.mut.Lock()
-	defer jl.mut.Unlock()
+	return jl.jobList.Len() - 1
+}
 
-	return jl.jobList.Len()
+//Stop 停止定时器的执行，里边未完成任务将会取消执行
+func (jl *Clock) Stop() {
+	jl.exitChan <- singal
+
+	jl.cleanJobs()
+}
+
+//StopGracefull 停止定时器，并将定时器中的待执行任务立即执行一次
+//Note:对于任务队列中，即使安排执行多次或者不限次数的，也仅仅执行一次。
+func (jl *Clock) StopGracefull() {
+	jl.exitChan <- singal
+
+	jl.immediate()
 }
