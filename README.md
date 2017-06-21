@@ -12,7 +12,7 @@
  - support task function call, and event notifications
  - support task that executes once or several times
  - support task cancel which added
- - 100k/s execution,  add  or remove task operation
+ - 100k/s execution,  add  or remove task operation(note:this indicator may not be available on the cloud server,see more [test file](https://github.com/alex023/clock/blob/master/clock_test.go#L265-L289))
      
  # Example
  ## add a task that executes once
