@@ -40,23 +40,29 @@ func (je jobItem) Less(another rbtree.Item) bool {
 func (je *jobItem) C() <-chan Job {
 	return je.msgChan
 }
-func (je *jobItem) done() {
+
+func (je *jobItem) doWithGo(withGo bool) {
 	je.count++
 	if je.fn != nil {
-		go func() {
-			defer func() {
-				if err := recover(); err != nil {
-					panic(err)
-				}
-			}()
-			je.fn()
-		}()
+		if withGo {
+			go je.action()
+		} else {
+			je.action()
+		}
 	}
 	select {
 	case je.msgChan <- je:
 	default:
 		//some times,client should not receive msgChan,so must discard jobItem when blocking
 	}
+}
+func (je *jobItem) action() {
+	defer func() {
+		if err := recover(); err != nil {
+			panic(err)
+		}
+	}()
+	je.fn()
 }
 
 // Count implement for Job

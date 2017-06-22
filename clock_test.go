@@ -310,7 +310,7 @@ func TestClock_Stop(t *testing.T) {
 }
 func TestClock_StopGracefull(t *testing.T) {
 	var (
-		jobsNum     = 1000
+		jobsNum     = 2000
 		myClock     = NewClock()
 		jobInterval = time.Millisecond * 100
 		count       = int32(0)
@@ -319,10 +319,9 @@ func TestClock_StopGracefull(t *testing.T) {
 		atomic.AddInt32(&count, 1)
 	}
 	for i := 0; i < jobsNum; i++ {
-		myClock.addJob(time.Now(), jobInterval*time.Duration(i), 1, fn)
+		myClock.addJob(time.Now(), time.Second+jobInterval*time.Duration(i), 1, fn)
 	}
 	myClock.StopGracefull()
-	time.Sleep(time.Second * 1)
 	if count != int32(jobsNum) {
 		t.Errorf("定时器没有正常结束，执行了%d次，实际应该为%v\n.", count, jobsNum)
 	}
