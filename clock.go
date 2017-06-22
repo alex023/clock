@@ -103,7 +103,7 @@ func (jl *Clock) immediate() {
 			atomic.AddUint64(&jl.count, 1)
 
 			job := item.(*jobItem)
-			job.done()
+			job.doWithGo(false)
 
 			jl.removeJob(job)
 
@@ -127,7 +127,7 @@ Pause:
 		case <-timer.C:
 			jl.count++
 
-			job.done()
+			job.doWithGo(true)
 
 			if job.times == 0 || job.times > job.count {
 				jl.jobList.Delete(job)
@@ -310,6 +310,7 @@ func (jl *Clock) Reset() *Clock {
 	jl.start()
 	return jl
 }
+
 func (jl *Clock) cleanJobs() {
 	item := jl.jobList.Min()
 	for item != nil {
@@ -337,7 +338,7 @@ func (jl *Clock) Stop() {
 	jl.cleanJobs()
 }
 
-//StopGracefull stop clock ,and do once every waiting job
+//StopGracefull stop clock ,and do once every waiting job including Once\Reapeat
 //Note:对于任务队列中，即使安排执行多次或者不限次数的，也仅仅执行一次。
 func (jl *Clock) StopGracefull() {
 	jl.exit()
