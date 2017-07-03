@@ -247,6 +247,7 @@ func (jl *Clock) addJob(createTime time.Time, jobInterval time.Duration, jobTime
 		intervalTime: jobInterval,
 		msgChan:      make(chan Job, 10),
 		fn:           jobFunc,
+		clock:        jl,
 	}
 	jl.jobList.Insert(job)
 
@@ -255,6 +256,7 @@ func (jl *Clock) addJob(createTime time.Time, jobInterval time.Duration, jobTime
 }
 
 // DelJob Deletes the task that has been added to the task queue. If the key does not exist, return false.
+//Deprecated @0.7
 func (jl *Clock) DelJob(job Job) (deleted bool) {
 	if job == nil {
 		deleted = false
@@ -275,6 +277,7 @@ func (jl *Clock) DelJob(job Job) (deleted bool) {
 }
 
 // DelJobs remove jobs from clock schedule list
+//Deprecated @0.7
 func (jl *Clock) DelJobs(jobIds []Job) {
 	jl.pause()
 	defer jl.resume()
@@ -289,9 +292,27 @@ func (jl *Clock) DelJobs(jobIds []Job) {
 
 	return
 }
+
 func (jl *Clock) removeJob(item *jobItem) {
 	jl.jobList.Delete(item)
 	close(item.msgChan)
+
+	return
+}
+
+func (jl *Clock) rmJob(job Job) {
+	if job == nil {
+		return
+	}
+
+	jl.pause()
+	defer jl.resume()
+
+	item, ok := job.(*jobItem)
+	if !ok {
+		return
+	}
+	jl.removeJob(item)
 
 	return
 }

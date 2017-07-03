@@ -84,7 +84,7 @@ func TestClock_WaitJobs(t *testing.T) {
 	if myClock.WaitJobs() != 1 {
 		t.Error("数据列表操作获取的数据与Clock实际情况不一致！")
 	}
-	myClock.DelJob(job)
+	job.Cancel()
 
 }
 
@@ -146,8 +146,8 @@ func TestClock_AddRepeatJob2(t *testing.T) {
 	}
 	time.Sleep(time.Second)
 
-	myClock.DelJob(event1)
-	myClock.DelJob(event2)
+	event1.Cancel()
+	event2.Cancel()
 
 }
 
@@ -227,9 +227,10 @@ func TestClock_DelJob(t *testing.T) {
 		jobs[i] = job
 	}
 
-	deleted := myClock.DelJob(jobs[delmod])
-	if !deleted || myClock.WaitJobs() != uint(jobsNum-1) {
-		t.Errorf("任务删除%v，删除后，应该只剩下%v条任务，实际还有%v条\n", deleted, myClock.Count(), jobsNum-1)
+	readyCancelJob := jobs[delmod]
+	readyCancelJob.Cancel()
+	if myClock.WaitJobs() != uint(jobsNum-1) {
+		t.Errorf("任务删除后，应该只剩下%v条任务，实际还有%v条\n", myClock.Count(), jobsNum-1)
 
 	}
 }

@@ -2,6 +2,7 @@ package clock
 
 import (
 	"github.com/HuKeping/rbtree"
+	"sync/atomic"
 	"time"
 )
 
@@ -10,6 +11,7 @@ type Job interface {
 	C() <-chan Job //C Get a Chan，which can get message if Job is executed
 	Count() uint64 //计数器，表示已执行（或触发）的次数
 	Times() uint64 //允许执行的最大次数
+	Cancel()       //撤销加载的任务，不再定时执行
 }
 
 // jobItem implementation of "Job" and "rbtree.Item"
@@ -22,6 +24,8 @@ type jobItem struct {
 	actionTime   time.Time     //计算得出的此次执行时间点，有误差
 	fn           func()        //事件函数
 	msgChan      chan Job      //消息通道，执行时，控制器通过该通道向外部传递消息
+	cancelFlag   int32
+	clock        *Clock
 }
 
 // Less Based rbtree ，implements Item interface for sort
@@ -63,6 +67,13 @@ func (je *jobItem) action() {
 		}
 	}()
 	je.fn()
+}
+
+func (je *jobItem) Cancel() {
+	if atomic.CompareAndSwapInt32(&je.cancelFlag, 0, 1) {
+		je.clock.rmJob(je)
+		je.clock = nil
+	}
 }
 
 // Count implement for Job

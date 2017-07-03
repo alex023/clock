@@ -92,7 +92,7 @@ func ExampleClock_AddJobWithDeadtime() {
 
 	//任务执行前，撤销任务
 	time.Sleep(time.Millisecond * 300)
-	myClock.DelJob(job)
+	job.Cancel()
 
 	//等待2秒，正常情况下，事件不会再执行
 	time.Sleep(2 * time.Second)
@@ -117,7 +117,7 @@ func ExampleClock_RmJob() {
 
 	//任务执行前，撤销任务
 	time.Sleep(time.Millisecond * 500)
-	myClock.DelJob(job)
+	job.Cancel()
 
 	//等待2秒，正常情况下，事件不会再执行
 	time.Sleep(2 * time.Second)
