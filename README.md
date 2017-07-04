@@ -24,7 +24,7 @@
  		}
  	)
  	//add a task that executes once,interval 100 millisecond
- 	jobClock.AddJobWithInterval(time.Duration(100*time.Millisecond), jobFunc)
+ 	myClock.AddJobWithInterval(time.Duration(100*time.Millisecond), jobFunc)
  
  	//wait a second,watching 
  	time.Sleep(1 * time.Second)
