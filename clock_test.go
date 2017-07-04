@@ -266,7 +266,7 @@ func TestClock_DelJobs(t *testing.T) {
 //TestClock_Delay_200kJob 测试2秒内能否执行20万条任务。
 // Note:笔记本(尤其是windows操作系统）,云服务可能无法通过测试
 func TestClock_Delay_200kJob(t *testing.T) {
-	// for pass travis
+	// skip just for pass travis because of lack of performance
 	t.Skip()
 	var (
 		jobsNum     = 200000 //添加任务数量
@@ -311,6 +311,7 @@ func TestClock_Stop(t *testing.T) {
 		t.Errorf("定时器没有正常结束，执行了%d次，实际应该为0.", count)
 	}
 }
+
 func TestClock_StopGracefull(t *testing.T) {
 	var (
 		jobsNum     = 2000
@@ -322,7 +323,7 @@ func TestClock_StopGracefull(t *testing.T) {
 		atomic.AddInt32(&count, 1)
 	}
 	for i := 0; i < jobsNum; i++ {
-		myClock.addJob(time.Now(), time.Second+jobInterval*time.Duration(i), 1, fn)
+		myClock.AddJobRepeat(time.Second+jobInterval*time.Duration(i), 1, fn)
 	}
 	myClock.StopGracefull()
 	if count != int32(jobsNum) {
