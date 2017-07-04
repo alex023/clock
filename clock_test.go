@@ -330,6 +330,7 @@ func TestClock_StopGracefull(t *testing.T) {
 		t.Errorf("定时器没有正常结束，执行了%d次，实际应该为%v\n.", count, jobsNum)
 	}
 }
+
 func BenchmarkClock_AddJob(b *testing.B) {
 	myClock := NewClock().Reset()
 	b.ResetTimer()
@@ -339,5 +340,27 @@ func BenchmarkClock_AddJob(b *testing.B) {
 			b.Error("can not insert jobItem")
 			break
 		}
+	}
+}
+
+func BenchmarkClock_UpdateJob(b *testing.B) {
+	var (
+		jobsNum  = 2000
+		myClock  = NewClock()
+		jobCache = make([]Job, jobsNum)
+		r        = rand.New(rand.NewSource(time.Now().Unix()))
+	)
+	for i := 0; i < jobsNum; i++ {
+		job, inserted := myClock.AddJobWithInterval(time.Second*20, nil)
+		if !inserted {
+			b.Error("can not insert jobItem")
+			break
+		}
+		jobCache[i] = job
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		index := r.Intn(jobsNum)
+		myClock.UpdateJobTimeout(jobCache[index], time.Second*30)
 	}
 }
