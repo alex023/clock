@@ -278,10 +278,12 @@ func TestClock_Delay_200kJob(t *testing.T) {
 	}
 
 	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
-	for i := 0; i < jobsNum; i++ {
-		myClock.AddJobWithInterval(jobInterval, fn)
+	go func() {
+		for i := 0; i < jobsNum; i++ {
+			myClock.AddJobWithInterval(jobInterval, fn)
 
-	}
+		}
+	}()
 
 	time.Sleep(time.Second * 3)
 	if jobsNum != int(myClock.Count()) {
