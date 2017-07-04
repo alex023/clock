@@ -24,7 +24,7 @@
  		}
  	)
  	//add a task that executes once,interval 100 millisecond
- 	jobClock.AddJobWithInterval(time.Duration(100*time.Millisecond), jobFunc)
+ 	myClock.AddJobWithInterval(time.Duration(100*time.Millisecond), jobFunc)
  
  	//wait a second,watching 
  	time.Sleep(1 * time.Second)
@@ -73,7 +73,7 @@ func ExampleClock_RmJob(){
 
 	//任务执行前，撤销任务
 	time.Sleep(time.Millisecond*500)
-	myClock.DelJob(job)
+	job.Cancel()
 
 	//等待3秒，正常情况下，事件不会再执行
 	time.Sleep(3 * time.Second)
