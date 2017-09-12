@@ -4,6 +4,8 @@ import (
 	"github.com/HuKeping/rbtree"
 	"sync/atomic"
 	"time"
+	"runtime/debug"
+	"log"
 )
 
 // Job External access interface for timed tasks
@@ -62,7 +64,8 @@ func (je *jobItem) action(callByGoroutine bool) {
 func (je *jobItem) call() {
 	defer func() {
 		if err := recover(); err != nil {
-			panic(err)
+			log.Printf("[clock] recovering reason is %+v. More detail:",err)
+			log.Println(string(debug.Stack()))
 		}
 	}()
 	je.fn()
