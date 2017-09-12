@@ -79,7 +79,7 @@ func (jl *Clock) start() {
 	now := time.Now()
 	_, inserted := jl.addJob(now, untouchedJob.intervalTime, 1, untouchedJob.fn)
 	if !inserted {
-		panic("Clock start")
+		panic("[clock] internal error.Reason cannot insert job.")
 	}
 	//开启守护协程
 	go jl.schedule()
@@ -255,6 +255,7 @@ func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, acti
 }
 
 // DelJob Deletes the task that has been added to the task queue. If the key does not exist, return false.
+// move jobItem.Cancel()
 //Deprecated @0.7
 func (jl *Clock) DelJob(job Job) (deleted bool) {
 	if job == nil {
@@ -276,6 +277,7 @@ func (jl *Clock) DelJob(job Job) (deleted bool) {
 }
 
 // DelJobs remove jobs from clock schedule list
+// move jobItem.Cancel()
 //Deprecated @0.7
 func (jl *Clock) DelJobs(jobIds []Job) {
 	jl.pause()
