@@ -48,12 +48,10 @@ func (je *jobItem) C() <-chan Job {
 
 func (je *jobItem) action(callByGoroutine bool) {
 	je.count++
-	if je.fn != nil {
-		if callByGoroutine {
-			go je.call()
-		} else {
-			je.call()
-		}
+	if callByGoroutine {
+		go je.call()
+	} else {
+		je.call()
 	}
 	select {
 	case je.msgChan <- je:
@@ -64,7 +62,7 @@ func (je *jobItem) action(callByGoroutine bool) {
 func (je *jobItem) call() {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("[clock] recovering reason is %+v. More detail:",err)
+			log.Printf("[clock] recovering reason is %+v. More detail:", err)
 			log.Println(string(debug.Stack()))
 		}
 	}()

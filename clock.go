@@ -170,64 +170,64 @@ func (jl *Clock) UpdateJobTimeout(job Job, actionTime time.Duration) (updated bo
 }
 
 // AddJobWithInterval insert a timed task with time duration after now
-// 	@actionTime:	duration after now
-//	@jobFunc:		action function
+// 	@actionTime:	Duration after now
+//	@jobFunc:		Callback function,not nil
 //	return
 // 	@jobScheduled:	A reference to a task that has been scheduled.
 func (jl *Clock) AddJobWithInterval(actionInterval time.Duration, jobFunc func()) (jobScheduled Job, inserted bool) {
-	if actionInterval.Nanoseconds() <= 0 {
-		return nil, false
+	if jobFunc == nil || actionInterval.Nanoseconds() <= 0 {
+		return
 	}
 	now := time.Now()
 
 	jl.pause()
 
-	newitem, inserted := jl.addJob(now, actionInterval, 1, jobFunc)
+	jobScheduled, inserted = jl.addJob(now, actionInterval, 1, jobFunc)
 
 	jl.resume()
 
-	jobScheduled = newitem
 	return
 }
 
 // AddJobWithDeadtime insert a timed task with time point after now
-//	@actionTime:	Execution start time. must after now,else return false
-//	@jobFunc:		Execution function
+//	@actionTime:	Execution start time. must after now
+//	@jobFunc:		Callback function,not nil
 //	return
-// 	@jobScheduled:	A reference to a task that has been scheduled.
+// 	@jobScheduled	:	A reference to a task that has been scheduled.
+//	@inserted		:	return false ,if actionTime before time.Now or jobFunc is nil
 func (jl *Clock) AddJobWithDeadtime(actionTime time.Time, jobFunc func()) (jobScheduled Job, inserted bool) {
 	actionInterval := actionTime.Sub(time.Now())
-	if actionInterval.Nanoseconds() <= 0 {
-		return nil, false
+	if jobFunc==nil || actionInterval.Nanoseconds() <= 0 {
+		return
 	}
 	now := time.Now()
 
 	jl.pause()
 
-	newItem, inserted := jl.addJob(now, actionInterval, 1, jobFunc)
+	jobScheduled, inserted = jl.addJob(now, actionInterval, 1, jobFunc)
 
 	jl.resume()
 
-	jobScheduled = newItem
 	return
 }
 
 // AddJobRepeat add a repeat task with interval duration
-//	@actionTime:	The two time interval operation
+//	@interval:		The two time interval operation
 //	@jobTimes:		The number of job execution
-//	@jobFunc:		The function of job execution
+//	@jobFunc:		Callback function,not nil
 //	return
-// 	@jobScheduled:	A reference to a task that has been scheduled.
+// 	@jobScheduled	:	A reference to a task that has been scheduled.
+//	@inserted		:	return false ,if interval is not Positiveor jobFunc is nil
 //Note：
 // when jobTimes==0,the job will be executed without limitation。If you no longer use, be sure to call the DelJob method to release
-func (jl *Clock) AddJobRepeat(actionInterval time.Duration, jobTimes uint64, jobFunc func()) (jobScheduled Job, inserted bool) {
-	if actionInterval.Nanoseconds() <= 0 {
-		return nil, false
+func (jl *Clock) AddJobRepeat(interval time.Duration, jobTimes uint64, jobFunc func()) (jobScheduled Job, inserted bool) {
+	if jobFunc == nil || interval.Nanoseconds() <= 0 {
+		return
 	}
 	now := time.Now()
 
 	jl.pause()
-	newItem, inserted := jl.addJob(now, actionInterval, jobTimes, jobFunc)
+	newItem, inserted := jl.addJob(now, interval, jobTimes, jobFunc)
 
 	jl.resume()
 
@@ -236,7 +236,6 @@ func (jl *Clock) AddJobRepeat(actionInterval time.Duration, jobTimes uint64, job
 }
 
 func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, actionTimes uint64, jobFunc func()) (job *jobItem, inserted bool) {
-	inserted = true
 	jl.seq++
 	job = &jobItem{
 		id:           jl.seq,
@@ -249,6 +248,7 @@ func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, acti
 		clock:        jl,
 	}
 	jl.jobQueue.Insert(job)
+	inserted = true
 
 	return
 
