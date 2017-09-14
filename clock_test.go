@@ -221,9 +221,12 @@ func TestClock_DelJob(t *testing.T) {
 		delmod    = r.Intn(jobsNum)
 		myClock   = Default().Reset()
 	)
+	fn := func() {
+		//do nothing
+	}
 	for i := 0; i < jobsNum; i++ {
 		delay := time.Second + time.Duration(r.Intn(randscope)) //增加一秒作为延迟，以避免删除的时候，已经存在任务被通知执行，导致后续判断失误
-		job, _ := myClock.AddJobWithInterval(delay, nil)
+		job, _ := myClock.AddJobWithInterval(delay, fn)
 		jobs[i] = job
 	}
 
@@ -247,16 +250,25 @@ func TestClock_DelJobs(t *testing.T) {
 		randscope   = 1 * 1000 * 1000 * 1000
 		jobs        = make([]Job, jobsNum)
 		wantdeljobs = make([]Job, jobsNum)
+		fn          = func() {
+			//do nothing
+		}
 	)
 	for i := 0; i < jobsNum; i++ {
 		delay := time.Second + time.Duration(r.Intn(randscope)) //增加一秒作为延迟，以避免删除的时候，已经存在任务被通知执行，导致后续判断失误
-		job, _ := myClock.AddJobWithInterval(delay, nil)
+		job, insert := myClock.AddJobWithInterval(delay, fn)
+		if !insert {
+			t.Errorf("添加任务失败！")
+			return
+		}
 		jobs[i] = job
 		wantdeljobs[i] = job
 	}
 
-	myClock.DelJobs(wantdeljobs)
-
+	//myClock.DelJobs(wantdeljobs)
+	for _, job := range wantdeljobs {
+		job.Cancel()
+	}
 	if 0 != int(myClock.Count()) || myClock.WaitJobs() != 0 {
 		t.Errorf("应该执行%v次，实际执行%v次,此时任务队列中残余记录,myClock.actionindex.len=%v,\n", jobsNum-len(wantdeljobs), myClock.Count(), myClock.WaitJobs())
 
@@ -267,27 +279,33 @@ func TestClock_DelJobs(t *testing.T) {
 // Note:笔记本(尤其是windows操作系统）,云服务可能无法通过测试
 func TestClock_Delay_200kJob(t *testing.T) {
 	// skip just for pass travis because of lack of performance
-	t.Skip()
+	//t.Skip()
 	var (
 		jobsNum     = 200000 //添加任务数量
 		myClock     = NewClock()
 		jobInterval = time.Second
+		countChan   = make(chan int, 0)
+		count       = 0
+		fn          = func() {
+			countChan <- 1
+		}
 	)
-	fn := func() {
-		//do nothing
-	}
-
+	start := time.Now()
 	//初始化20万条任务。考虑到初始化耗时，延时1秒后启动
 	go func() {
 		for i := 0; i < jobsNum; i++ {
 			myClock.AddJobWithInterval(jobInterval, fn)
-
 		}
 	}()
-
-	time.Sleep(time.Second * 3)
-	if jobsNum != int(myClock.Count()) {
-		t.Errorf("应该执行%v次，实际执行%v次。\n", jobsNum, myClock.Count())
+	for range countChan {
+		count++
+		if count == jobsNum {
+			break
+		}
+	}
+	end := time.Now()
+	if end.Sub(start) > time.Second*3 {
+		t.Errorf("消耗应该控制在%v s,实际消耗%v s。\n", 3, end.Sub(start))
 	}
 }
 

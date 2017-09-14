@@ -2,10 +2,10 @@ package clock
 
 import (
 	"github.com/HuKeping/rbtree"
+	"log"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
-	"runtime/debug"
-	"log"
 )
 
 // Job External access interface for timed tasks
@@ -46,29 +46,18 @@ func (je *jobItem) C() <-chan Job {
 	return je.msgChan
 }
 
-func (je *jobItem) action(callByGoroutine bool) {
+func (je *jobItem) action(async bool) {
 	je.count++
-	if je.fn != nil {
-		if callByGoroutine {
-			go je.call()
-		} else {
-			je.call()
-		}
+	if async {
+		go safeCall(je.fn)
+	} else {
+		safeCall(je.fn)
 	}
 	select {
 	case je.msgChan <- je:
 	default:
 		//some times,client should not receive msgChan,so must discard jobItem when blocking
 	}
-}
-func (je *jobItem) call() {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Printf("[clock] recovering reason is %+v. More detail:",err)
-			log.Println(string(debug.Stack()))
-		}
-	}()
-	je.fn()
 }
 
 func (je *jobItem) Cancel() {
@@ -86,4 +75,13 @@ func (je jobItem) Count() uint64 {
 // Times implement for Job
 func (je jobItem) Times() uint64 {
 	return je.actionTimes
+}
+func safeCall(fn func()) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("[clock] recovering reason is %+v. More detail:", err)
+			log.Println(string(debug.Stack()))
+		}
+	}()
+	fn()
 }
