@@ -281,7 +281,7 @@ func TestClock_Delay_200kJob(t *testing.T) {
 	// skip just for pass travis because of lack of performance
 	//t.Skip()
 	var (
-		jobsNum     = 2000000 //添加任务数量
+		jobsNum     = 200000 //添加任务数量
 		myClock     = NewClock()
 		jobInterval = time.Second
 		countChan   = make(chan int, 0)

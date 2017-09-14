@@ -68,15 +68,15 @@ func NewClock() *Clock {
 	return c
 }
 func (jl *Clock) start() {
+	now := time.Now()
 	untouchedJob := jobItem{
-		createTime:   time.Now(),
+		createTime:   now,
 		intervalTime: time.Duration(math.MaxInt64),
 		fn: func() {
 			//this jobItem is untouched.
 		},
 	}
 
-	now := time.Now()
 	_, inserted := jl.addJob(now, untouchedJob.intervalTime, 1, untouchedJob.fn)
 	if !inserted {
 		panic("[clock] internal error.Reason cannot insert job.")
@@ -113,14 +113,17 @@ func (jl *Clock) immediate() {
 }
 
 func (jl *Clock) schedule() {
-	timer := time.NewTimer(_UNTOUCHED)
+	var (
+		timeout time.Duration
+		job     *jobItem
+		timer   = time.NewTimer(_UNTOUCHED)
+	)
 	defer timer.Stop()
 Pause:
 	<-jl.resumeChan
 	for {
-		v := jl.jobQueue.Min()
-		job, _ := v.(*jobItem) //ignore ok-assert
-		timeout := job.actionTime.Sub(time.Now())
+		job, _ = jl.jobQueue.Min().(*jobItem) //ignore ok-assert
+		timeout = job.actionTime.Sub(time.Now())
 		timer.Reset(timeout)
 		select {
 		case <-timer.C:
@@ -153,13 +156,13 @@ func (jl *Clock) UpdateJobTimeout(job Job, actionTime time.Duration) (updated bo
 	}
 	now := time.Now()
 
-	jl.pause()
-	defer jl.resume()
-
 	item, ok := job.(*jobItem)
 	if !ok {
 		return false
 	}
+	jl.pause()
+	defer jl.resume()
+
 	// update jobitem in job queue
 	jl.jobQueue.Delete(item)
 	item.actionTime = now.Add(actionTime)
@@ -181,9 +184,7 @@ func (jl *Clock) AddJobWithInterval(actionInterval time.Duration, jobFunc func()
 	now := time.Now()
 
 	jl.pause()
-
 	jobScheduled, inserted = jl.addJob(now, actionInterval, 1, jobFunc)
-
 	jl.resume()
 
 	return
@@ -203,16 +204,14 @@ func (jl *Clock) AddJobWithDeadtime(actionTime time.Time, jobFunc func()) (jobSc
 	now := time.Now()
 
 	jl.pause()
-
 	jobScheduled, inserted = jl.addJob(now, actionInterval, 1, jobFunc)
-
 	jl.resume()
 
 	return
 }
 
 // AddJobRepeat add a repeat task with interval duration
-//	@interval:		The two time interval operation
+//	@interval:		The interval between two actions of the job
 //	@jobTimes:		The number of job execution
 //	@jobFunc:		Callback function,not nil
 //	return
@@ -227,11 +226,9 @@ func (jl *Clock) AddJobRepeat(interval time.Duration, jobTimes uint64, jobFunc f
 	now := time.Now()
 
 	jl.pause()
-	newItem, inserted := jl.addJob(now, interval, jobTimes, jobFunc)
-
+	jobScheduled, inserted = jl.addJob(now, interval, jobTimes, jobFunc)
 	jl.resume()
 
-	jobScheduled = newItem
 	return
 }
 
@@ -262,19 +259,15 @@ func (jl *Clock) removeJob(item *jobItem) {
 }
 
 func (jl *Clock) rmJob(job Job) {
-	if job == nil {
+	item, ok := job.(*jobItem)
+	if !ok || job == nil {
 		return
 	}
 
 	jl.pause()
 	defer jl.resume()
 
-	item, ok := job.(*jobItem)
-	if !ok {
-		return
-	}
 	jl.removeJob(item)
-
 	return
 }
 
