@@ -197,7 +197,7 @@ func (jl *Clock) AddJobWithInterval(actionInterval time.Duration, jobFunc func()
 //	@inserted		:	return false ,if actionTime before time.Now or jobFunc is nil
 func (jl *Clock) AddJobWithDeadtime(actionTime time.Time, jobFunc func()) (jobScheduled Job, inserted bool) {
 	actionInterval := actionTime.Sub(time.Now())
-	if jobFunc==nil || actionInterval.Nanoseconds() <= 0 {
+	if jobFunc == nil || actionInterval.Nanoseconds() <= 0 {
 		return
 	}
 	now := time.Now()
@@ -252,46 +252,6 @@ func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, acti
 
 	return
 
-}
-
-// DelJob Deletes the task that has been added to the task queue. If the key does not exist, return false.
-// move jobItem.Cancel()
-//Deprecated @0.7
-func (jl *Clock) DelJob(job Job) (deleted bool) {
-	if job == nil {
-		deleted = false
-		return
-	}
-
-	jl.pause()
-	defer jl.resume()
-
-	item, ok := job.(*jobItem)
-	if !ok {
-		return false
-	}
-	jl.removeJob(item)
-	deleted = true
-
-	return
-}
-
-// DelJobs remove jobs from clock schedule list
-// move jobItem.Cancel()
-//Deprecated @0.7
-func (jl *Clock) DelJobs(jobIds []Job) {
-	jl.pause()
-	defer jl.resume()
-
-	for _, job := range jobIds {
-		item, ok := job.(*jobItem)
-		if !ok {
-			continue
-		}
-		jl.removeJob(item)
-	}
-
-	return
 }
 
 func (jl *Clock) removeJob(item *jobItem) {
