@@ -108,6 +108,7 @@ func TestClock_WaitJobs(t *testing.T) {
 		myClock  = Default().Reset()
 		interval = time.Millisecond
 		waitChan = make(chan struct{})
+		jobsNum  = 1000
 		jobFunc  = func() {
 			//do nothing
 		}
@@ -118,7 +119,7 @@ func TestClock_WaitJobs(t *testing.T) {
 	}
 
 	go func() {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < jobsNum; i++ {
 			time.Sleep(time.Millisecond * 10)
 			waitJobs := myClock.WaitJobs()
 			if waitJobs != 1 {
@@ -136,21 +137,20 @@ func TestClock_WaitJobs(t *testing.T) {
 
 }
 
-//TestClock_AddRepeatJob 测试重复任务定时执行情况
-func TestClock_AddRepeatJob(t *testing.T) {
+//TestClock_Count 测试重复任务定时执行情况
+func TestClock_Count(t *testing.T) {
 	var (
-		myClock   = Default().Reset()
-		jobsNum   = 1000                                                    //执行次数
-		randscope = 50 * 1000                                               //随机范围
-		interval  = time.Microsecond*100 + time.Duration(r.Intn(randscope)) //100-150µs时间间隔
-		counter   = new(_Counter)
+		myClock  = Default().Reset()
+		jobsNum  = 1000
+		interval = time.Microsecond * 10
+		counter  = new(_Counter)
 	)
 	f := func() {
 		counter.AddOne()
 	}
 	job, inserted := myClock.AddJobRepeat(interval, uint64(jobsNum), f)
 	if !inserted {
-		t.Error("任务初始化失败，任务事件没有添加成功")
+		t.Error("add repeat job failure")
 	}
 	for range job.C() {
 
@@ -158,7 +158,7 @@ func TestClock_AddRepeatJob(t *testing.T) {
 	//重复任务的方法是协程调用，可能还没有执行，job.C就已经退出，需要阻塞观察
 	time.Sleep(time.Second)
 	if int(myClock.Count()) != jobsNum || counter.Count() != jobsNum {
-		t.Errorf("任务添加存在问题,应该%v次，实际执行%v\n", myClock.count, counter.Count())
+		t.Errorf("should execute %vtimes，but execute %v times \n", myClock.count, counter.Count())
 	}
 
 }
@@ -190,13 +190,12 @@ func TestClock_AddRepeatJob2(t *testing.T) {
 	event2, inserted2 := myClock.AddJobRepeat(interval2, 0, func() { jobFunc(2) })
 
 	if !inserted1 || !inserted2 {
-		t.Error("任务初始化失败，没有添加成功")
+		t.Error("add repeat job failure")
 	}
 	time.Sleep(time.Second)
 
 	event1.Cancel()
 	event2.Cancel()
-
 }
 
 //TestClock_AddMixJob 测试一次性任务+重复性任务的运行撤销情况
@@ -216,7 +215,7 @@ func TestClock_AddMixJob(t *testing.T) {
 	_, inserted2 := myClock.AddJobRepeat(time.Millisecond*300, 0, f2)
 
 	if !inserted1 && !inserted2 {
-		t.Fatal("任务添加失败！")
+		t.Error("add repeat job failure")
 	}
 	time.Sleep(time.Second * 2)
 	if counter1 != 1 || counter2 < 5 {
