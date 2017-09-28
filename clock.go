@@ -44,12 +44,13 @@ func initClock() {
 
 // Clock is jobs schedule
 type Clock struct {
-	seq        uint64
-	jobQueue   *rbtree.Rbtree //inner memory storage
-	count      uint64         //已执行次数，不得大于times
-	pauseChan  chan struct{}
-	resumeChan chan struct{}
-	exitChan   chan struct{}
+	seq         uint64
+	jobQueue    *rbtree.Rbtree //inner memory storage
+	count       uint64         //已执行次数，不得大于times
+	waitJobsNum uint64
+	pauseChan   chan struct{}
+	resumeChan  chan struct{}
+	exitChan    chan struct{}
 }
 
 var singal = struct{}{}
@@ -116,7 +117,7 @@ func (jl *Clock) schedule() {
 	var (
 		timeout time.Duration
 		job     *jobItem
-		timer   = time.NewTimer(_UNTOUCHED)
+		timer   = newSafeTimer(_UNTOUCHED)
 	)
 	defer timer.Stop()
 Pause:
@@ -124,10 +125,12 @@ Pause:
 	for {
 		job, _ = jl.jobQueue.Min().(*jobItem) //ignore ok-assert
 		timeout = job.actionTime.Sub(time.Now())
-		timer.Reset(timeout)
+		timer.SafeReset(timeout)
 		select {
 		case <-timer.C:
-			jl.count++
+			timer.SCR()
+
+			atomic.AddUint64(&jl.count, 1)
 
 			job.action(true)
 
@@ -151,7 +154,7 @@ Exit:
 //	@job:			job identifier
 //	@actionTime:	new job schedule time,must be greater than 0
 func (jl *Clock) UpdateJobTimeout(job Job, actionTime time.Duration) (updated bool) {
-	if actionTime.Nanoseconds() <= 0 {
+	if job == nil || actionTime.Nanoseconds() <= 0 {
 		return false
 	}
 	now := time.Now()
@@ -234,6 +237,7 @@ func (jl *Clock) AddJobRepeat(interval time.Duration, jobTimes uint64, jobFunc f
 
 func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, actionTimes uint64, jobFunc func()) (job *jobItem, inserted bool) {
 	jl.seq++
+	jl.waitJobsNum++
 	job = &jobItem{
 		id:           jl.seq,
 		actionTimes:  actionTimes,
@@ -253,6 +257,8 @@ func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, acti
 
 func (jl *Clock) removeJob(item *jobItem) {
 	jl.jobQueue.Delete(item)
+	jl.waitJobsNum--
+
 	close(item.msgChan)
 
 	return
@@ -298,12 +304,9 @@ func (jl *Clock) cleanJobs() {
 }
 
 //WaitJobs get how much jobs waiting for call
-func (jl *Clock) WaitJobs() uint {
-	tmp := jl.jobQueue.Len() - 1
-	if tmp > 0 {
-		return tmp
-	}
-	return 0
+func (jl *Clock) WaitJobs() uint64 {
+	jobs := atomic.LoadUint64(&jl.waitJobsNum) - 1
+	return jobs
 }
 
 //Stop stop clock , and cancel all waiting jobs
@@ -315,7 +318,7 @@ func (jl *Clock) Stop() {
 
 //StopGracefull stop clock ,and do once every waiting job including Once\Reapeat
 //Note:对于任务队列中，即使安排执行多次或者不限次数的，也仅仅执行一次。
-func (jl *Clock) StopGracefull() {
+func (jl *Clock) StopGraceful() {
 	jl.exit()
 
 	jl.immediate()
