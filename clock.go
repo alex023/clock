@@ -117,8 +117,7 @@ func (jl *Clock) schedule() {
 	var (
 		timeout time.Duration
 		job     *jobItem
-		//timer   = time.NewTimer(_UNTOUCHED)
-		timer=newSafeTimer(_UNTOUCHED)
+		timer   = newSafeTimer(_UNTOUCHED)
 	)
 	defer timer.Stop()
 Pause:
@@ -126,17 +125,7 @@ Pause:
 	for {
 		job, _ = jl.jobQueue.Min().(*jobItem) //ignore ok-assert
 		timeout = job.actionTime.Sub(time.Now())
-
-		//if !timer.Stop() {
-		//	select {
-		//	case <-timer.C:
-		//	default:
-		//	}
-		//}
-		//if !timer.Reset(timeout){
-		//	fmt.Println("reset failure")
-		//}
-	timer.SafeReset(timeout)
+		timer.SafeReset(timeout)
 		select {
 		case <-timer.C:
 			timer.SCR()
@@ -165,7 +154,7 @@ Exit:
 //	@job:			job identifier
 //	@actionTime:	new job schedule time,must be greater than 0
 func (jl *Clock) UpdateJobTimeout(job Job, actionTime time.Duration) (updated bool) {
-	if actionTime.Nanoseconds() <= 0 {
+	if job == nil || actionTime.Nanoseconds() <= 0 {
 		return false
 	}
 	now := time.Now()
