@@ -61,6 +61,47 @@ func TestClock_AddOnceJob(t *testing.T) {
 	}
 }
 
+//TestJob_Cancel 测试多协程访问情况下，任务撤销的安全性
+func TestJob_Cancel(t *testing.T) {
+	var (
+		myClock   = Default().Reset()
+		interval  = time.Microsecond
+		waitChan1 = make(chan struct{})
+		waitChan2 = make(chan struct{})
+
+		jobFunc = func() {
+			//do nothing
+		}
+	)
+	job, inserted := myClock.AddJobRepeat(interval, 0, jobFunc)
+	if !inserted {
+		t.Error("add repeat job failure")
+	}
+
+	go func() {
+		expect := uint64(1)
+		for i := 0; i < 500; i++ {
+			time.Sleep(time.Millisecond * 10)
+			waitJobs := myClock.WaitJobs()
+			if waitJobs != expect {
+				t.Errorf("waitJobs=%v are inconsistent with expectations\n", waitJobs)
+			}
+			if i == 200 {
+				waitChan1 <- struct{}{}
+				expect = 0
+			}
+		}
+		waitChan2 <- struct{}{}
+	}()
+	<-waitChan1
+	job.Cancel()
+	<-waitChan2
+
+	if myClock.WaitJobs() != 0 {
+		t.Error("数据列表操作获取的数据与Clock实际情况不一致！")
+	}
+}
+
 //TestClock_WaitJobs 测试当前待执行任务列表中的事件
 func TestClock_WaitJobs(t *testing.T) {
 	var (
@@ -79,9 +120,9 @@ func TestClock_WaitJobs(t *testing.T) {
 	go func() {
 		for i := 0; i < 1000; i++ {
 			time.Sleep(time.Millisecond * 10)
-			waitJobs:=myClock.WaitJobs()
-			if  waitJobs!= 1 {
-				t.Errorf("waitJobs=%v are inconsistent with expectations\n",waitJobs)
+			waitJobs := myClock.WaitJobs()
+			if waitJobs != 1 {
+				t.Errorf("waitJobs=%v are inconsistent with expectations\n", waitJobs)
 			}
 		}
 		waitChan <- struct{}{}

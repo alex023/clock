@@ -15,7 +15,7 @@
  - fault isolation
  - 100k/s operation
  
- >last indicator may not be available on the cloud server,see more [test code](https://github.com/alex023/clock/blob/master/clock_test.go#L287-L317)
+ >last indicator may not be available on the cloud server,see more [test code](https://github.com/alex023/clock/blob/master/clock_test.go#L328-L358)
      
  # Example
  ## add a task that executes once

@@ -117,7 +117,8 @@ func (jl *Clock) schedule() {
 	var (
 		timeout time.Duration
 		job     *jobItem
-		timer   = time.NewTimer(_UNTOUCHED)
+		//timer   = time.NewTimer(_UNTOUCHED)
+		timer=newSafeTimer(_UNTOUCHED)
 	)
 	defer timer.Stop()
 Pause:
@@ -125,9 +126,21 @@ Pause:
 	for {
 		job, _ = jl.jobQueue.Min().(*jobItem) //ignore ok-assert
 		timeout = job.actionTime.Sub(time.Now())
-		timer.Reset(timeout)
+
+		//if !timer.Stop() {
+		//	select {
+		//	case <-timer.C:
+		//	default:
+		//	}
+		//}
+		//if !timer.Reset(timeout){
+		//	fmt.Println("reset failure")
+		//}
+	timer.SafeReset(timeout)
 		select {
 		case <-timer.C:
+			timer.SCR()
+
 			atomic.AddUint64(&jl.count, 1)
 
 			job.action(true)
@@ -303,7 +316,7 @@ func (jl *Clock) cleanJobs() {
 
 //WaitJobs get how much jobs waiting for call
 func (jl *Clock) WaitJobs() uint64 {
-	jobs :=atomic.LoadUint64(&jl.waitJobsNum) - 1
+	jobs := atomic.LoadUint64(&jl.waitJobsNum) - 1
 	return jobs
 }
 
