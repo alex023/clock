@@ -33,7 +33,6 @@ func TestClock_Create(t *testing.T) {
 		t.Errorf("JobList init have error.len=%d,count=%d", myClock.WaitJobs(), myClock.Count())
 		//joblist.Debug()
 	}
-
 }
 
 func TestClock_AddOnceJob(t *testing.T) {
@@ -65,26 +64,34 @@ func TestClock_AddOnceJob(t *testing.T) {
 //TestClock_WaitJobs 测试当前待执行任务列表中的事件
 func TestClock_WaitJobs(t *testing.T) {
 	var (
-		myClock   = Default().Reset()
-		randscope = 50 * 1000 * 1000 //随机范围
-		interval  = time.Millisecond*50 + time.Duration(r.Intn(randscope))
-		jobFunc   = func() {
-			//fmt.Println("任务事件")
+		myClock  = Default().Reset()
+		interval = time.Millisecond
+		waitChan = make(chan struct{})
+		jobFunc  = func() {
+			//do nothing
 		}
 	)
 	job, inserted := myClock.AddJobRepeat(interval, 0, jobFunc)
 	if !inserted {
-		t.Error("定时任务创建失败")
+		t.Error("add repeat job failure")
 	}
-	time.Sleep(time.Second)
 
-	if myClock.WaitJobs() != 1 {
-		t.Error("任务添加异常")
-	}
-	if myClock.WaitJobs() != 1 {
+	go func() {
+		for i := 0; i < 1000; i++ {
+			time.Sleep(time.Millisecond * 10)
+			waitJobs:=myClock.WaitJobs()
+			if  waitJobs!= 1 {
+				t.Errorf("waitJobs=%v are inconsistent with expectations\n",waitJobs)
+			}
+		}
+		waitChan <- struct{}{}
+	}()
+	<-waitChan
+
+	job.Cancel()
+	if myClock.WaitJobs() != 0 {
 		t.Error("数据列表操作获取的数据与Clock实际情况不一致！")
 	}
-	job.Cancel()
 
 }
 
@@ -131,7 +138,7 @@ func TestClock_AddRepeatJob2(t *testing.T) {
 		cacheSigal := 2
 		for z := range singalChan {
 			if z == cacheSigal {
-				t.Error("两个任务没有间隔执行")
+				t.Error("two tasks are not executed alternately。")
 			} else {
 				cacheSigal = z
 			}
@@ -232,7 +239,7 @@ func TestClock_DelJob(t *testing.T) {
 
 	readyCancelJob := jobs[delmod]
 	readyCancelJob.Cancel()
-	if myClock.WaitJobs() != uint(jobsNum-1) {
+	if myClock.WaitJobs() != uint64(jobsNum-1) {
 		t.Errorf("任务删除后，应该只剩下%v条任务，实际还有%v条\n", myClock.Count(), jobsNum-1)
 
 	}
