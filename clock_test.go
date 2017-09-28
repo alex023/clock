@@ -350,7 +350,7 @@ func TestClock_StopGracefull(t *testing.T) {
 	for i := 0; i < jobsNum; i++ {
 		myClock.AddJobRepeat(time.Second+jobInterval*time.Duration(i), 1, fn)
 	}
-	myClock.StopGracefull()
+	myClock.StopGraceful()
 	if count != int32(jobsNum) {
 		t.Errorf("定时器没有正常结束，执行了%d次，实际应该为%v\n.", count, jobsNum)
 	}

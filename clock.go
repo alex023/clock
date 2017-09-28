@@ -128,7 +128,7 @@ Pause:
 		timer.Reset(timeout)
 		select {
 		case <-timer.C:
-			jl.count++
+			atomic.AddUint64(&jl.count, 1)
 
 			job.action(true)
 
@@ -303,11 +303,6 @@ func (jl *Clock) cleanJobs() {
 
 //WaitJobs get how much jobs waiting for call
 func (jl *Clock) WaitJobs() uint64 {
-	//tmp := jl.jobQueue.Len() - 1
-	//if tmp > 0 {
-	//	return tmp
-	//}
-
 	jobs :=atomic.LoadUint64(&jl.waitJobsNum) - 1
 	return jobs
 }
@@ -321,7 +316,7 @@ func (jl *Clock) Stop() {
 
 //StopGracefull stop clock ,and do once every waiting job including Once\Reapeat
 //Note:对于任务队列中，即使安排执行多次或者不限次数的，也仅仅执行一次。
-func (jl *Clock) StopGracefull() {
+func (jl *Clock) StopGraceful() {
 	jl.exit()
 
 	jl.immediate()
