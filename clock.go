@@ -269,11 +269,12 @@ func (jl *Clock) rmJob(job Job) {
 	if !ok || job == nil {
 		return
 	}
+	if atomic.CompareAndSwapInt32(&item.cancelFlag, 0, 1) {
+		jl.pause()
+		defer jl.resume()
 
-	jl.pause()
-	defer jl.resume()
-
-	jl.removeJob(item)
+		jl.removeJob(item)
+	}
 	return
 }
 
