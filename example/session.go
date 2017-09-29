@@ -81,7 +81,10 @@ func (s *Session) RemoveToken(token string) {
 	s.Lock()
 	defer s.Unlock()
 	fmt.Printf("%v| [removed] token [%v] by TTLSession \n", time.Now().Format("15:04:05"), token)
-	delete(s.cache, token)
+	if tokenjob,founded:=s.cache[token];founded{
+		delete(s.cache, token)
+		tokenjob.job.Cancel()
+	}
 }
 
 func main() {
