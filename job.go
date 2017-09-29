@@ -4,7 +4,6 @@ import (
 	"github.com/HuKeping/rbtree"
 	"log"
 	"runtime/debug"
-	"sync/atomic"
 	"time"
 )
 
@@ -61,10 +60,8 @@ func (je *jobItem) action(async bool) {
 }
 
 func (je *jobItem) Cancel() {
-	if atomic.CompareAndSwapInt32(&je.cancelFlag, 0, 1) {
 		je.clock.rmJob(je)
 		je.clock = nil
-	}
 }
 
 // Count implement for Job
