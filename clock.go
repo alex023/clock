@@ -47,7 +47,7 @@ type Clock struct {
 	seq         uint64
 	jobQueue    *rbtree.Rbtree //inner memory storage
 	count       uint64         //已执行次数，不得大于times
-	waitJobsNum uint64
+	waitJobsNum uint64         //num of jobs which wait for action
 	pauseChan   chan struct{}
 	resumeChan  chan struct{}
 	exitChan    chan struct{}
@@ -256,25 +256,22 @@ func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, acti
 }
 
 func (jl *Clock) removeJob(item *jobItem) {
-	jl.jobQueue.Delete(item)
-	jl.waitJobsNum--
+	if jl.jobQueue.Delete(item) != nil {
+		jl.waitJobsNum--
 
-	close(item.msgChan)
-
-	return
+		//job.Cancel --> rmJob -->removeJob; schedule -->removeJob
+		//it is call repeatly when Job.Cancel
+		if atomic.CompareAndSwapInt32(&item.cancelFlag, 0, 1) {
+			item.innerCancel()
+		}
+	}
 }
 
-func (jl *Clock) rmJob(job Job) {
-	item, ok := job.(*jobItem)
-	if !ok || job == nil {
-		return
-	}
-	if atomic.CompareAndSwapInt32(&item.cancelFlag, 0, 1) {
-		jl.pause()
-		defer jl.resume()
+func (jl *Clock) rmJob(job *jobItem) {
+	jl.pause()
+	defer jl.resume()
 
-		jl.removeJob(item)
-	}
+	jl.removeJob(job)
 	return
 }
 

@@ -5,6 +5,7 @@ import (
 	"log"
 	"runtime/debug"
 	"time"
+	"sync/atomic"
 )
 
 // Job External access interface for timed tasks
@@ -60,8 +61,14 @@ func (je *jobItem) action(async bool) {
 }
 
 func (je *jobItem) Cancel() {
-	je.clock.rmJob(je)
+	if atomic.CompareAndSwapInt32(&je.cancelFlag, 0, 1) {
+		je.clock.rmJob(je)
+		je.innerCancel()
+	}
+}
+func (je *jobItem) innerCancel() {
 	je.clock = nil
+	close(je.msgChan)
 }
 
 // Count implement for Job
