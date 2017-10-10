@@ -47,7 +47,7 @@ type Clock struct {
 	seq         uint64
 	jobQueue    *rbtree.Rbtree //inner memory storage
 	count       uint64         //已执行次数，不得大于times
-	waitJobsNum uint64
+	waitJobsNum uint64         //num of jobs which wait for action
 	pauseChan   chan struct{}
 	resumeChan  chan struct{}
 	exitChan    chan struct{}
@@ -134,7 +134,7 @@ Pause:
 
 			job.action(true)
 
-			if job.actionTimes == 0 || job.actionTimes > job.count {
+			if job.actionMax == 0 || job.actionMax > job.actionCount {
 				jl.jobQueue.Delete(job)
 				job.actionTime = job.actionTime.Add(job.intervalTime)
 				jl.jobQueue.Insert(job)
@@ -215,32 +215,32 @@ func (jl *Clock) AddJobWithDeadtime(actionTime time.Time, jobFunc func()) (jobSc
 
 // AddJobRepeat add a repeat task with interval duration
 //	@interval:		The interval between two actions of the job
-//	@jobTimes:		The number of job execution
+//	@actionMax:		The number of job execution
 //	@jobFunc:		Callback function,not nil
 //	return
 // 	@jobScheduled	:	A reference to a task that has been scheduled.
 //	@inserted		:	return false ,if interval is not Positiveor jobFunc is nil
 //Note：
 // when jobTimes==0,the job will be executed without limitation。If you no longer use, be sure to call the DelJob method to release
-func (jl *Clock) AddJobRepeat(interval time.Duration, jobTimes uint64, jobFunc func()) (jobScheduled Job, inserted bool) {
+func (jl *Clock) AddJobRepeat(interval time.Duration, actionMax uint64, jobFunc func()) (jobScheduled Job, inserted bool) {
 	if jobFunc == nil || interval.Nanoseconds() <= 0 {
 		return
 	}
 	now := time.Now()
 
 	jl.pause()
-	jobScheduled, inserted = jl.addJob(now, interval, jobTimes, jobFunc)
+	jobScheduled, inserted = jl.addJob(now, interval, actionMax, jobFunc)
 	jl.resume()
 
 	return
 }
 
-func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, actionTimes uint64, jobFunc func()) (job *jobItem, inserted bool) {
+func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, actionMax uint64, jobFunc func()) (job *jobItem, inserted bool) {
 	jl.seq++
 	jl.waitJobsNum++
 	job = &jobItem{
 		id:           jl.seq,
-		actionTimes:  actionTimes,
+		actionMax:    actionMax,
 		createTime:   createTime,
 		actionTime:   createTime.Add(actionInterval),
 		intervalTime: actionInterval,
@@ -256,25 +256,22 @@ func (jl *Clock) addJob(createTime time.Time, actionInterval time.Duration, acti
 }
 
 func (jl *Clock) removeJob(item *jobItem) {
-	jl.jobQueue.Delete(item)
-	jl.waitJobsNum--
+	if jl.jobQueue.Delete(item) != nil {
+		jl.waitJobsNum--
 
-	close(item.msgChan)
-
-	return
+		//job.Cancel --> rmJob -->removeJob; schedule -->removeJob
+		//it is call repeatly when Job.Cancel
+		if atomic.CompareAndSwapInt32(&item.cancelFlag, 0, 1) {
+			item.innerCancel()
+		}
+	}
 }
 
-func (jl *Clock) rmJob(job Job) {
-	item, ok := job.(*jobItem)
-	if !ok || job == nil {
-		return
-	}
-	if atomic.CompareAndSwapInt32(&item.cancelFlag, 0, 1) {
-		jl.pause()
-		defer jl.resume()
+func (jl *Clock) rmJob(job *jobItem) {
+	jl.pause()
+	defer jl.resume()
 
-		jl.removeJob(item)
-	}
+	jl.removeJob(job)
 	return
 }
 

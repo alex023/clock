@@ -5,21 +5,22 @@ import (
 	"log"
 	"runtime/debug"
 	"time"
+	"sync/atomic"
 )
 
 // Job External access interface for timed tasks
 type Job interface {
 	C() <-chan Job //C Get a Chan，which can get message if Job is executed
 	Count() uint64 //计数器，表示已执行（或触发）的次数
-	Times() uint64 //允许执行的最大次数
+	Max() uint64   //允许执行的最大次数
 	Cancel()       //撤销加载的任务，不再定时执行
 }
 
 // jobItem implementation of  "Job" interface and "rbtree.Item" interface
 type jobItem struct {
 	id           uint64        //唯一键值，内部由管理器生成，以区分同一时刻的不同任务事件
-	count        uint64        //计数器，表示已执行（或触发）的次数
-	actionTimes  uint64        //允许执行的最大次数
+	actionCount  uint64        //计数器，表示已执行（或触发）的次数
+	actionMax    uint64        //允许执行的最大次数
 	intervalTime time.Duration //间隔时间
 	createTime   time.Time     //创建时间，略有误差
 	actionTime   time.Time     //计算得出的最近一次执行时间点
@@ -46,7 +47,7 @@ func (je *jobItem) C() <-chan Job {
 }
 
 func (je *jobItem) action(async bool) {
-	je.count++
+	je.actionCount++
 	if async {
 		go safeCall(je.fn)
 	} else {
@@ -60,18 +61,24 @@ func (je *jobItem) action(async bool) {
 }
 
 func (je *jobItem) Cancel() {
+	if atomic.CompareAndSwapInt32(&je.cancelFlag, 0, 1) {
 		je.clock.rmJob(je)
-		je.clock = nil
+		je.innerCancel()
+	}
+}
+func (je *jobItem) innerCancel() {
+	je.clock = nil
+	close(je.msgChan)
 }
 
 // Count implement for Job
 func (je jobItem) Count() uint64 {
-	return je.count
+	return je.actionCount
 }
 
-// Times implement for Job
-func (je jobItem) Times() uint64 {
-	return je.actionTimes
+// Max implement for Job
+func (je jobItem) Max() uint64 {
+	return je.actionMax
 }
 func safeCall(fn func()) {
 	defer func() {
