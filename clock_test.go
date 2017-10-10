@@ -397,10 +397,11 @@ func TestClock_StopGracefull(t *testing.T) {
 }
 
 func BenchmarkClock_AddJob(b *testing.B) {
+	fn := func() { /*do nothing*/ }
 	myClock := NewClock().Reset()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, inserted := myClock.AddJobWithInterval(time.Second*5, nil)
+		_, inserted := myClock.AddJobWithInterval(time.Second*5, fn)
 		if !inserted {
 			b.Error("can not insert jobItem")
 			break
@@ -414,9 +415,10 @@ func BenchmarkClock_UpdateJob(b *testing.B) {
 		myClock  = NewClock()
 		jobCache = make([]Job, jobsNum)
 		r        = rand.New(rand.NewSource(time.Now().Unix()))
+		fn       = func() { /*do nothing*/ }
 	)
 	for i := 0; i < jobsNum; i++ {
-		job, inserted := myClock.AddJobWithInterval(time.Second*20, nil)
+		job, inserted := myClock.AddJobWithInterval(time.Second*20, fn)
 		if !inserted {
 			b.Error("can not insert jobItem")
 			break
