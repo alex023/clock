@@ -109,4 +109,16 @@ func main() {
 		}
 		fmt.Printf("%v|[watching] token [%v] founded=%v\n", time.Now().Format("15:04:05"), token2, session.GetToken(token2))
 	}
+	fmt.Println()
+
+	token3 := "alex023_3"
+	fmt.Println("add token and update it after timeout")
+	session.AddToken(token3, time.Second*3)
+	for i := 0; i < 10; i++ {
+		time.Sleep(time.Second * 1)
+		if i == 5 {
+			session.AddToken(token3, time.Second*3)
+		}
+		fmt.Printf("%v|[watching] token [%v] founded=%v\n", time.Now().Format("15:04:05"), token3, session.GetToken(token3))
+	}
 }

@@ -4,16 +4,17 @@ import (
 	"github.com/HuKeping/rbtree"
 	"log"
 	"runtime/debug"
-	"time"
 	"sync/atomic"
+	"time"
 )
 
 // Job External access interface for timed tasks
 type Job interface {
-	C() <-chan Job //C Get a Chan，which can get message if Job is executed
-	Count() uint64 //计数器，表示已执行（或触发）的次数
-	Max() uint64   //允许执行的最大次数
-	Cancel()       //撤销加载的任务，不再定时执行
+	C() <-chan Job     //C Get a Chan，which can get message if Job is executed
+	Count() uint64     //计数器，表示已执行（或触发）的次数
+	Max() uint64       //允许执行的最大次数
+	Cancel()           //撤销加载的任务，不再定时执行
+	isAvailable() bool //return true，if job not action or not cancel
 }
 
 // jobItem implementation of  "Job" interface and "rbtree.Item" interface
@@ -65,6 +66,9 @@ func (je *jobItem) Cancel() {
 		je.clock.rmJob(je)
 		je.innerCancel()
 	}
+}
+func (je *jobItem) isAvailable() bool {
+	return je.cancelFlag == 0
 }
 func (je *jobItem) innerCancel() {
 	je.clock = nil
