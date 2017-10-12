@@ -136,7 +136,41 @@ func TestClock_WaitJobs(t *testing.T) {
 	}
 
 }
+func TestClock_UpdateJobTimeout(t *testing.T) {
+	//思路：
+	//检查任务在结束前后进行 update 的情况
+	var (
+		jobsNum= 100
+		randscope = 1 * 1000 * 1000 * 1000
+		jobs= make([]Job, jobsNum)
+		myClock= Default().Reset()
+	)
+	fn := func() {
+		//do nothing
+		//fmt.Println("fn is action")
+	}
+	for i := 0; i < jobsNum; i++ {
+		delay := time.Microsecond*1500 +time.Duration(r.Intn(randscope)) //[0.5-1.5]
+		job, _ := myClock.AddJobWithInterval(delay, fn)
+		jobs[i] = job
+	}
+	time.Sleep(time.Second)
+	//fmt.Println("waitjobs=", myClock.WaitJobs())
+	//fmt.Println(jobs[0].isAvailable())
+	var survive int
+	for i := 0; i < jobsNum; i++ {
+		job := jobs[i]
+		if myClock.UpdateJobTimeout(job, time.Second) {
+			survive++
+		}
+	}
 
+	if waitJobs := myClock.WaitJobs(); waitJobs != uint64(survive) {
+		t.Errorf("任务重新设置时，应该%v条任务有效，实际还有%v条\n", survive, waitJobs)
+
+	}
+	time.Sleep(time.Second)
+}
 //TestClock_Count 测试重复任务定时执行情况
 func TestClock_Count(t *testing.T) {
 	var (

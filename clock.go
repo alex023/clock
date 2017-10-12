@@ -154,7 +154,7 @@ Exit:
 //	@job:			job identifier
 //	@actionTime:	new job schedule time,must be greater than 0
 func (jl *Clock) UpdateJobTimeout(job Job, actionTime time.Duration) (updated bool) {
-	if job == nil || actionTime.Nanoseconds() <= 0 {
+	if job == nil || actionTime.Nanoseconds() <= 0 || !job.isAvailable() {
 		return false
 	}
 	now := time.Now()
