@@ -45,9 +45,9 @@ func initClock() {
 // Clock is jobs schedule
 type Clock struct {
 	seq         uint64
-	jobQueue    *rbtree.Rbtree //inner memory storage
 	count       uint64         //已执行次数，不得大于times
 	waitJobsNum uint64         //num of jobs which wait for action
+	jobQueue    *rbtree.Rbtree //inner memory storage
 	pauseChan   chan struct{}
 	resumeChan  chan struct{}
 	exitChan    chan struct{}
